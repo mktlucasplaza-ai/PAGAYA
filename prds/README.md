@@ -28,4 +28,5 @@ Para redactar un PRD nuevo, copiar `_plantilla-prd.md`.
 
 | PRD | Título | Estado | Fecha |
 |-----|--------|--------|-------|
-| [PRD-001](PRD-001-pagaya-mvp.md) | PAGAYA — Pago rápido y autogestión de mesa en restaurantes (MVP) | Vigente | 2026-09-25 |
+| [PRD-001](PRD-001-pagaya-mvp.md) | PAGAYA — Pago rápido y autogestión de mesa en restaurantes (MVP) | Base, modificado por PRD-002 | 2026-09-25 |
+| [PRD-002](PRD-002-pagos-chile-propinas-identificacion-y-beneficios.md) | Pagos en Chile, propinas, identificación de mesa y beneficios por nivel | Vigente | 2026-09-25 |
