@@ -24,8 +24,11 @@ Esto importa porque **la fricción se paga una sola vez** y el contraste es el
 producto.
 
 Camila llega por primera vez, se sienta en la Mesa 7, escanea el QR del soporte
-de la mesa, ingresa el **PIN 3182** impreso ahí mismo, se registra con su número
-de teléfono y un código OTP. **40 segundos.** Pide, come, paga en la app.
+de la mesa e ingresa el **PIN 3182** impreso ahí mismo. Ve la carta completa sin
+registrarse y arma su pedido: un pisco sour y una ensalada. Al tocar
+**"Enviar pedido"**, la app le pide registrarse —nombre de pila, teléfono, OTP—:
+**38 segundos**, y el pedido que ya tenía armado se envía solo, sin rearmarlo
+(PRD-004 §2.1). Come y paga en la app.
 
 Al terminar, la app le pide feedback: puntajes de comida y atención. Ella
 responde. La app le dice: *"Visita 1 registrada. A las 5 visitas tienes 10 % de
