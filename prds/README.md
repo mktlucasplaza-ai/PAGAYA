@@ -31,7 +31,8 @@ Para redactar un PRD nuevo, copiar `_plantilla-prd.md`.
 | [PRD-001](PRD-001-pagaya-mvp.md) | PAGAYA — Pago rápido y autogestión de mesa en restaurantes (MVP) | Base, modificado por PRD-002 | 2026-09-25 |
 | [PRD-002](PRD-002-pagos-chile-propinas-identificacion-y-beneficios.md) | Pagos en Chile, propinas, identificación de mesa y beneficios por nivel | Modificado por PRD-003 | 2026-09-25 |
 | [PRD-003](PRD-003-gate-de-piloto-y-seguridad-del-pagaya-id.md) | Gate de piloto y seguridad del PAGAYA ID | Modificado por PRD-004 | 2026-09-26 |
-| [PRD-004](PRD-004-registro-obligatorio-para-pedir.md) | Registro obligatorio para pedir | Vigente | 2026-09-26 |
+| [PRD-004](PRD-004-registro-obligatorio-para-pedir.md) | Registro obligatorio para pedir | Modificado por PRD-005 | 2026-09-26 |
+| [PRD-005](PRD-005-primer-pedido-por-el-mesero.md) | El mesero también puede tomar el primer pedido | Vigente | 2026-09-26 |
 
 ## Anexos
 
