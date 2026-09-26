@@ -29,4 +29,14 @@ Para redactar un PRD nuevo, copiar `_plantilla-prd.md`.
 | PRD | Título | Estado | Fecha |
 |-----|--------|--------|-------|
 | [PRD-001](PRD-001-pagaya-mvp.md) | PAGAYA — Pago rápido y autogestión de mesa en restaurantes (MVP) | Base, modificado por PRD-002 | 2026-09-25 |
-| [PRD-002](PRD-002-pagos-chile-propinas-identificacion-y-beneficios.md) | Pagos en Chile, propinas, identificación de mesa y beneficios por nivel | Vigente | 2026-09-25 |
+| [PRD-002](PRD-002-pagos-chile-propinas-identificacion-y-beneficios.md) | Pagos en Chile, propinas, identificación de mesa y beneficios por nivel | Modificado por PRD-003 | 2026-09-25 |
+| [PRD-003](PRD-003-gate-de-piloto-y-seguridad-del-pagaya-id.md) | Gate de piloto y seguridad del PAGAYA ID | Vigente | 2026-09-26 |
+
+## Anexos
+
+Documentos de apoyo que **no definen alcance**: si un anexo contradice un PRD,
+manda el PRD.
+
+| Anexo | Descripción |
+|---|---|
+| [Escenario: la séptima visita de Camila](anexos/escenario-camila-septima-visita.md) | Recorrido end-to-end de una noche real, con las tres vistas (cliente, mesero, administrador) y los casos borde. Referencia para diseño, QA y capacitación. |
