@@ -1,0 +1,18 @@
+{
+  "name": "@pagaya/mesa",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Mesa, sesión de mesa y PIN (RF-C-01, PRD-002 §3). No importa comanda ni pago: una mesa no sabe de dinero.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/contrato": "*",
+    "@pagaya/base-datos": "*",
+    "@pagaya/auditoria": "*",
+    "@pagaya/notificacion": "*",
+    "@pagaya/identidad": "*"
+  }
+}

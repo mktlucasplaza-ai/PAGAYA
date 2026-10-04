@@ -1,0 +1,10 @@
+{
+  "name": "@pagaya/contrato",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "El contrato de la API compartido entre servidor y clientes (AT-1, consecuencia 1). Solo tipos: no puede arrastrar código de servidor al navegador.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

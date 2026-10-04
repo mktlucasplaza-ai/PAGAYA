@@ -1,0 +1,22 @@
+{
+  "ambiente": "staging",
+  "api": {
+    "puerto": 8080,
+    "origenes_permitidos": ["https://staging.pagaya.cl"]
+  },
+  "base_datos": {
+    "ssl": true,
+    "max_conexiones": 20
+  },
+  "repartidor": {
+    "intervalo_sondeo_ms": 1000,
+    "tope_reintentos": 5
+  },
+  "registro": {
+    "nivel": "info"
+  },
+  "secretos": {
+    "url_base_datos": "PAGAYA_BD_URL",
+    "firma_sesion": "PAGAYA_FIRMA_SESION"
+  }
+}

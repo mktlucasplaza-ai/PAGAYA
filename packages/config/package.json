@@ -1,0 +1,13 @@
+{
+  "name": "@pagaya/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Carga el ambiente desde ambientes/*.json y los secretos desde el entorno.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@pagaya/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Proceso API + WebSocket (AT-1). Es el único que puede ver todos los módulos: su trabajo es exponerlos.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/contrato": "*",
+    "@pagaya/config": "*",
+    "@pagaya/base-datos": "*",
+    "@pagaya/auditoria": "*",
+    "@pagaya/notificacion": "*",
+    "@pagaya/identidad": "*",
+    "@pagaya/mesa": "*",
+    "@pagaya/comanda": "*",
+    "@pagaya/fidelizacion": "*",
+    "@pagaya/pago": "*"
+  }
+}

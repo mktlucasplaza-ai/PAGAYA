@@ -1,0 +1,10 @@
+{
+  "name": "@pagaya/nucleo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Errores tipificados, reloj y secretos. Si importara algo, todo el grafo tendría un ciclo.",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

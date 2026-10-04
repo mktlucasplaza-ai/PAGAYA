@@ -1,0 +1,13 @@
+# Dependencias y artefactos de compilación
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Credenciales locales. Nunca se commitean: los ambientes declaran el *nombre*
+# de cada secreto (ambientes/*.json), nunca su valor.
+.env
+.env.*
+!.env.ejemplo
+
+# Sistema operativo y editores
+.DS_Store

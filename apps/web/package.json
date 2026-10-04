@@ -1,0 +1,13 @@
+{
+  "name": "@pagaya/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Web app del cliente y panel del administrador en el mismo código (AT-1). Solo el contrato: nada de servidor ni de base de datos puede llegar al navegador.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/contrato": "*"
+  }
+}
