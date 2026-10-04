@@ -1,0 +1,183 @@
+{
+  "comentario": [
+    "Frontera explícita entre los módulos de arquitectura.md AT-1. Esta es la",
+    "única fuente de verdad del grafo de importación: eslint.config.js la",
+    "traduce a reglas de lint y scripts/fronteras.prueba.ts verifica que el",
+    "grafo sea coherente y que el código real lo respete.",
+    "Agregar una arista es una decisión de arquitectura: va con su motivo en el",
+    "campo 'porque' y, si cambia la forma del grafo, en docs/arquitectura.md."
+  ],
+  "capas": {
+    "base": "No dependen de nada: tipos y utilidades. Las puede importar cualquiera.",
+    "infraestructura": "Hablan con el mundo exterior (archivos, PostgreSQL).",
+    "transversal": "Las usan todos los módulos de dominio; no conocen a ninguno.",
+    "dominio": "Las reglas de negocio. Nunca las importa una capa inferior.",
+    "aplicacion": "Procesos y clientes desplegables. Nadie los importa."
+  },
+  "orden_de_capas": [
+    "base",
+    "infraestructura",
+    "transversal",
+    "dominio",
+    "aplicacion"
+  ],
+  "dependencias_externas": {
+    "comentario": "Una dependencia de terceros que solo puede entrar por un paquete. PRD-002 §5.2 exige que ninguna regla de negocio conozca el nombre de la pasarela; la misma idea se aplica al controlador de la base de datos y al resto de los proveedores a medida que entren (push, SMS).",
+    "pg": [
+      "@pagaya/base-datos"
+    ]
+  },
+  "paquetes": {
+    "@pagaya/nucleo": {
+      "ruta": "packages/nucleo",
+      "capa": "base",
+      "puede_importar": [],
+      "porque": "Errores tipificados, reloj y secretos. Si importara algo, todo el grafo tendría un ciclo."
+    },
+    "@pagaya/contrato": {
+      "ruta": "packages/contrato",
+      "capa": "base",
+      "puede_importar": [],
+      "porque": "El contrato de la API compartido entre servidor y clientes (AT-1, consecuencia 1). Solo tipos: no puede arrastrar código de servidor al navegador."
+    },
+    "@pagaya/config": {
+      "ruta": "packages/config",
+      "capa": "infraestructura",
+      "puede_importar": [
+        "@pagaya/nucleo"
+      ],
+      "porque": "Carga el ambiente desde ambientes/*.json y los secretos desde el entorno."
+    },
+    "@pagaya/base-datos": {
+      "ruta": "packages/base-datos",
+      "capa": "infraestructura",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/config"
+      ],
+      "porque": "Pool de PostgreSQL y migraciones. Es la capa única de acceso que AT-1 exige para filtrar local_id."
+    },
+    "@pagaya/auditoria": {
+      "ruta": "packages/auditoria",
+      "capa": "transversal",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/base-datos"
+      ],
+      "porque": "Todo módulo de dominio escribe auditoría en su misma transacción (F1-04). Si auditoria importara un módulo de dominio habría un ciclo con todos."
+    },
+    "@pagaya/notificacion": {
+      "ruta": "packages/notificacion",
+      "capa": "transversal",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/base-datos",
+        "@pagaya/contrato"
+      ],
+      "porque": "Dueña del outbox (AT-2). No importa ningún módulo de dominio a propósito: el filtro de RF-M-02 vive en el productor, no acá."
+    },
+    "@pagaya/identidad": {
+      "ruta": "packages/identidad",
+      "capa": "dominio",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/contrato",
+        "@pagaya/base-datos",
+        "@pagaya/auditoria",
+        "@pagaya/notificacion"
+      ],
+      "porque": "Cuentas, OTP, sesiones y PAGAYA ID (RF-C-02, RF-C-25, PRD-003 §3)."
+    },
+    "@pagaya/mesa": {
+      "ruta": "packages/mesa",
+      "capa": "dominio",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/contrato",
+        "@pagaya/base-datos",
+        "@pagaya/auditoria",
+        "@pagaya/notificacion",
+        "@pagaya/identidad"
+      ],
+      "porque": "Mesa, sesión de mesa y PIN (RF-C-01, PRD-002 §3). No importa comanda ni pago: una mesa no sabe de dinero."
+    },
+    "@pagaya/comanda": {
+      "ruta": "packages/comanda",
+      "capa": "dominio",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/contrato",
+        "@pagaya/base-datos",
+        "@pagaya/auditoria",
+        "@pagaya/notificacion",
+        "@pagaya/identidad",
+        "@pagaya/mesa"
+      ],
+      "porque": "Ítems, participantes y comanda.version (AT-3). No importa pago: la comanda no conoce la pasarela; pago la importa a ella."
+    },
+    "@pagaya/fidelizacion": {
+      "ruta": "packages/fidelizacion",
+      "capa": "dominio",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/contrato",
+        "@pagaya/base-datos",
+        "@pagaya/auditoria",
+        "@pagaya/identidad"
+      ],
+      "porque": "Visitas, niveles y beneficio_activo derivado (AT-4, regla 3). No importa comanda ni pago: beneficio_activo se deriva, no se concede."
+    },
+    "@pagaya/pago": {
+      "ruta": "packages/pago",
+      "capa": "dominio",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/contrato",
+        "@pagaya/base-datos",
+        "@pagaya/auditoria",
+        "@pagaya/notificacion",
+        "@pagaya/identidad",
+        "@pagaya/comanda",
+        "@pagaya/fidelizacion"
+      ],
+      "porque": "Intentos de cobro, congelamiento y calcular_cuenta (AT-3, AT-4). Es el único módulo que conoce la interfaz de proveedor (PRD-002 §5.2, PRD-007 §2.1)."
+    },
+    "@pagaya/api": {
+      "ruta": "apps/api",
+      "capa": "aplicacion",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/contrato",
+        "@pagaya/config",
+        "@pagaya/base-datos",
+        "@pagaya/auditoria",
+        "@pagaya/notificacion",
+        "@pagaya/identidad",
+        "@pagaya/mesa",
+        "@pagaya/comanda",
+        "@pagaya/fidelizacion",
+        "@pagaya/pago"
+      ],
+      "porque": "Proceso API + WebSocket (AT-1). Es el único que puede ver todos los módulos: su trabajo es exponerlos."
+    },
+    "@pagaya/repartidor": {
+      "ruta": "apps/repartidor",
+      "capa": "aplicacion",
+      "puede_importar": [
+        "@pagaya/nucleo",
+        "@pagaya/config",
+        "@pagaya/base-datos",
+        "@pagaya/notificacion"
+      ],
+      "porque": "Segundo proceso del despliegue (AT-1, AT-2): reparte el outbox. No importa ningún módulo de dominio; si lo necesitara, el evento está mal diseñado."
+    },
+    "@pagaya/web": {
+      "ruta": "apps/web",
+      "capa": "aplicacion",
+      "puede_importar": [
+        "@pagaya/contrato"
+      ],
+      "porque": "Web app del cliente y panel del administrador en el mismo código (AT-1). Solo el contrato: nada de servidor ni de base de datos puede llegar al navegador."
+    }
+  }
+}

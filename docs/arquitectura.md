@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Alcance según** | PRD-001 a PRD-005 (RF vigentes, con sus modificaciones aplicadas) |
+| **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
 | **Fecha** | 2026-10-04 |
@@ -30,6 +30,12 @@ AT-1 Stack
        └─ AT-4 Invariante ─ se impone en la misma transacción que congela (AT-3)
                             y su rechazo se audita
 ```
+
+Debajo de las cuatro está la **fundación del repositorio** (§8): el monorepo que
+convierte la frontera de AT-1 en un dato verificable, las migraciones donde se
+escriben las invariantes de AT-2, AT-3 y AT-4, los ambientes y la puerta de
+verificación. No es una quinta decisión del mismo tipo: es dónde viven las otras
+cuatro.
 
 El hilo común: **las reglas que involucran dinero o identidad no viven en la
 interfaz**. Viven en una transacción de base de datos, porque es el único lugar
@@ -318,6 +324,9 @@ demás son valores por defecto técnicos y viven en configuración.
 | S-3 | Plazos de escalamiento al administrador (la "X minutos" de PRD-001 §9): **3 min** para llamado de asistencia, **5 min** para productos agregados. | PRD-001 §9 los deja configurables sin fijar valor. Son configuración por local; se calibran con la operación real. |
 | S-4 | Entrega **al menos una vez**, no exactamente una vez. | No existe "exactamente una vez" de punta a punta con un proveedor de push de terceros. Se compensa con idempotencia del consumidor y con la lista en vivo como fuente de verdad (PRD-001 §9). |
 | S-5 | Retención del outbox: **30 días** los eventos entregados; los fallidos no se purgan. | Equilibrio entre tamaño de la tabla y poder reconstruir qué pasó en una noche concreta. |
+| S-6 | **Producción se agrega cuando llegue el piloto**, como un archivo más en `ambientes/` (§8.4). En Fase 1 existen solo dev y staging. | F1-01 pide dos ambientes; ningún PRD dice cuándo nace el tercero. PRD-001 §18 pone el piloto en la Fase 5. Si hiciera falta antes, es un archivo y los secretos del proveedor: no cambia código. |
+| S-7 | **PostgreSQL 16** en integración continua; la versión mínima soportada es **13**, porque `gen_random_uuid()` es parte del motor desde ahí y así ninguna migración necesita una extensión ni superusuario (§8.3). | Ningún PRD fija la versión del motor. Si el proveedor de staging obliga a una versión menor, vuelve la extensión `pgcrypto` y con ella el permiso de superusuario en el alta de la base. |
+| S-8 | **Node 22.18 o superior** como plataforma, y TypeScript ejecutado sin compilar (§8.2). | Ningún PRD fija el entorno de ejecución. Si un proveedor de despliegue obliga a una versión anterior, vuelve un paso de transpilación: cambia el `Makefile` y el despliegue, no el código. |
 
 ---
 
@@ -342,3 +351,215 @@ demás son valores por defecto técnicos y viven en configuración.
   `comanda.version` y `pago.version_congelada` (AT-3), y
   `pago.participante_beneficiario_id`, `nivel_aplicado`, `porcentaje_aplicado`
   (AT-4).
+
+---
+
+## 8. La fundación del repositorio (F1-01)
+
+Lo que las cuatro decisiones anteriores necesitan para existir como código.
+Las exige **F1-01** del [backlog](backlog-fase-1.md) ("Monorepo, CI y ambientes
+(dev, staging)", PRD-001 §13), de la que dependen todas las demás tareas de la
+Fase 1. Son cinco decisiones y ninguna toca una regla de negocio: F1-01 entrega
+la fundación vacía y una prueba de que arranca.
+
+```
+AT-5 Monorepo ──── la frontera de AT-1 como dato verificable (fronteras.json)
+AT-6 Ejecución ─── TypeScript que corre sin compilar ni empaquetar
+AT-7 Migraciones ─ SQL a mano, inmutable, con huella; donde viven AT-2/3/4
+AT-8 Ambientes ─── dev y staging como archivo; las credenciales, nunca
+AT-9 La puerta ─── `make verify`, el mismo comando en el equipo y en la CI
+```
+
+### 8.1 AT-5 — Monorepo, y la frontera entre módulos como dato
+
+**Qué lo exige.** AT-1 decide módulos "con frontera explícita […] verificada por
+reglas de importación, no por despliegue separado", y nombra como consecuencia
+asumida que los dos clientes compartan "el contrato de la API […] como paquete
+de tipos". Una frontera que solo vive en un documento no es una frontera: AT-3
+ya advierte que si una escritura esquiva el punto único que incrementa
+`comanda.version`, "el congelamiento se vuelve una mentira silenciosa".
+
+**Decisión.** Un monorepo con **npm workspaces**: los siete módulos de AT-1
+(`mesa`, `comanda`, `identidad`, `pago`, `fidelizacion`, `notificacion`,
+`auditoria`) son paquetes, más cuatro de apoyo (`nucleo`, `contrato`, `config`,
+`base-datos`) y tres aplicaciones (`api`, `repartidor`, `web`).
+
+El grafo de importación vive en **`fronteras.json`**, en la raíz, con una arista
+por par y el motivo escrito al lado. De ahí salen tres cosas, no una:
+
+1. **`eslint.config.js`** lo traduce a `no-restricted-imports` por paquete: para
+   cada uno se prohíbe explícitamente todo `@pagaya/*` que su `puede_importar`
+   no nombre. La violación se ve en el editor.
+2. **`scripts/fronteras.prueba.ts`** es la verificación autoritativa: el grafo
+   es acíclico, ninguna capa depende de una más alta, cada `package.json` dice
+   lo mismo que el grafo, y el código real no tiene una importación que el grafo
+   no permita —incluido un `../../otro-modulo/src`, que el lint no ve porque no
+   resuelve rutas.
+3. **npm** resuelve por los `dependencies` de cada paquete, que la prueba obliga
+   a coincidir con el grafo. Si npm y el lint discreparan, uno de los dos
+   miente.
+
+Las fronteras que cuestan y por qué se pagan: `mesa` no importa `comanda` ni
+`pago` (una mesa no sabe de dinero); `comanda` no importa `pago` (la comanda no
+conoce la pasarela; `pago` la importa a ella); `notificacion` y `auditoria` no
+importan ningún módulo de dominio (si lo hicieran, el grafo tendría un ciclo con
+todos, y el filtro de RF-M-02 (mod.) de AT-2 dejaría de vivir en el productor);
+`fidelizacion` no importa `comanda` ni `pago`, que es la forma estructural de
+"`beneficio_activo` es derivado, no asignado" (AT-4, regla 3); y **`apps/web`
+solo puede importar `@pagaya/contrato`**, para que nada de servidor —el pool, un
+secreto, una función de cálculo— pueda viajar al navegador del cliente.
+
+El mismo archivo restringe las dependencias de terceros: `pg` solo entra por
+`@pagaya/base-datos`. Es la misma idea que PRD-002 §5.2 pide para la pasarela
+—ninguna regla de negocio conoce el nombre del proveedor— aplicada al resto.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Un repositorio por módulo | Las invariantes de AT-3 y AT-4 son transaccionales y cruzan módulos; repartirlas en repositorios obliga a versionar y publicar para cambiar dos líneas que viven en la misma transacción. Es el costo de los microservicios sin ninguno de sus beneficios. |
+| Carpetas dentro de un paquete único | Es lo mismo que no tener frontera: cualquier archivo importa cualquier otro con una ruta relativa y nadie se entera. AT-1 pide que la frontera esté *verificada*. |
+| Dejar la frontera en la revisión de código | Una regla que depende de que un humano la recuerde a las 2 de la mañana no es una regla. Y la revisión no escala a la tarea 40, que es donde esto se rompe. |
+| pnpm o Yarn en lugar de npm | Mejores en varias cosas, pero agregan un paso de instalación antes de poder correr `make verify`. La puerta tiene que poder correrla cualquiera con Node, incluido un agente en un contenedor recién creado. Si algún día hace falta, se cambia sin tocar un solo `import`. |
+| Nx o Turborepo | Resuelven caché de compilación y grafos de tareas que este repositorio no tiene todavía: hay tres aplicaciones y un `make verify` que dura segundos. Se agregan cuando el tiempo de verificación duela, no antes. |
+| `eslint-plugin-boundaries` u otro complemento | Hace casi lo mismo, pero deja la frontera escrita en la configuración del lint, donde solo la lee el lint. En `fronteras.json` la leen el lint, la prueba y cualquiera que quiera entender el sistema sin abrir el código. |
+
+### 8.2 AT-6 — TypeScript que corre sin compilar ni empaquetar
+
+**Qué lo exige.** Nada en los PRDs; es una decisión de operación del repositorio.
+La restricción que la gobierna es el principio rector de `CLAUDE.md`: la puerta
+de verificación tiene que poder correrla cualquiera, en cualquier equipo, sin
+preparación previa.
+
+**Decisión.** Node ejecuta los `.ts` directamente (quita los tipos al cargar,
+sin transpilar), y por eso:
+
+- **No hay paso de compilación ni empaquetador** en el servidor. Cada paquete
+  publica su `src/index.ts` en su campo `exports`.
+- **`tsc` no emite nada**: solo chequea tipos (`make tipos`).
+- **`erasableSyntaxOnly`** está activo en `tsconfig.json`: prohíbe la sintaxis
+  de TypeScript que no se puede borrar (`enum`, `namespace`, propiedades en el
+  constructor). Es la restricción que hace que lo que `tsc` aprueba sea
+  exactamente lo que Node puede correr.
+- **Las pruebas son `node:test`**, sin marco de pruebas. Se llaman
+  `*.prueba.ts`.
+- La cadena de herramientas se fija en lo que `typescript-eslint` soporta
+  (TypeScript 6, no 7): si el lint y el chequeo de tipos leyeran el lenguaje con
+  versiones distintas, uno de los dos estaría revisando otro programa.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Compilar a `dist/` con `tsc` y ejecutar JavaScript | Dos árboles de archivos, uno de los cuales se desincroniza; rutas de pila que apuntan a líneas que nadie escribió; y un paso más entre guardar y ver el resultado. |
+| `tsx`, `ts-node` o un empaquetador (esbuild, swc) | Resuelven un problema que Node ya resuelve. Cada uno es una dependencia más que puede romperse en una versión de Node y detener la puerta de verificación. |
+| Vitest o Jest | Dan vigilancia de archivos, cobertura y simulacros cómodos, y cuestan cientos de paquetes transitivos y una configuración propia. `node:test` alcanza para lo que F1-01 necesita; si la cobertura se vuelve un requisito, Node ya la trae. |
+| Un marco web (Express, Fastify) para el proceso API | No se decide acá: la tarea que tiene el requisito que lo decide es otra (ver §8.5). `node:http` sostiene `/salud` y no compromete nada. |
+
+### 8.3 AT-7 — Migraciones de SQL escritas a mano e inmutables
+
+**Qué lo exige.** Las tres decisiones anteriores viven en el esquema, no en el
+código: el índice único parcial que admite a lo más un pago en `autorizando` o
+`pagado` por comanda (AT-3), el `CHECK` y el disparador del descuento (AT-4), la
+tabla `evento_salida` (AT-2), y el `local_id` con *row level security* de AT-1.
+PRD-003 §5 pide que el descuento inválido sea "imposible de generar": eso se
+escribe en SQL.
+
+**Decisión.** Una migración es un archivo `NNNN_nombre.sql` en
+`packages/base-datos/migraciones/`, con numeración contigua, que **se aplica una
+vez y no se edita nunca** —la misma regla que los PRDs, por la misma razón—. El
+aplicador registra el nombre y la **huella sha256** de cada archivo en
+`pagaya.migracion`; si una migración ya aplicada cambió de contenido, se detiene
+antes de tocar la base. Cada migración corre con su registro en **una**
+transacción, y un cerrojo de asesoría impide que los dos procesos de AT-1
+apliquen la misma migración a la vez.
+
+La mecánica no sabe SQL: trabaja contra un puerto (`RegistroMigraciones`) que
+PostgreSQL implementa en un solo archivo. Eso es lo que permite probar el orden,
+la idempotencia y el rechazo de una migración alterada **sin una base de datos
+encendida**, y es la razón de que la prueba de integración sea corta.
+
+La primera migración no crea ninguna tabla: solo el esquema `pagaya` donde van a
+vivir. F1-01 prueba el camino, no el modelo; el modelo es F1-02.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Un ORM que genere las migraciones (Prisma, Drizzle) | Lo que este esquema necesita es justo lo que los generadores expresan peor o no expresan: *row level security*, índices únicos **parciales**, `CHECK` compuestos y disparadores (AT-1, AT-3, AT-4). Terminaríamos escribiendo SQL crudo dentro de una migración generada, con el modelo declarado en dos idiomas. |
+| Una herramienta de migraciones de terceros (`node-pg-migrate` y similares) | Son razonables. No se descartan por malas sino porque lo que agregan sobre 120 líneas propias es un formato de archivo y una dependencia en el camino crítico del arranque; y lo que no agregan es la huella que detecta una migración editada, que es la regla que más nos importa. |
+| Permitir editar una migración ya aplicada | La base y el repositorio dirían cosas distintas y nadie se enteraría hasta el día en que alguien recrea el esquema desde cero y no le queda igual. |
+| Aplicar las migraciones al arrancar el proceso API | Un despliegue que se reinicia solo aplica esquema sin que nadie lo decida, y dos procesos (AT-1) compiten por hacerlo. `make migrar` es un paso explícito. |
+
+### 8.4 AT-8 — Un ambiente es un archivo; una credencial es una variable
+
+**Qué lo exige.** PRD-001 §14 (datos de pago solo en la pasarela, cifrado en
+tránsito y en reposo) y PRD-001 §13 (multi-tenant desde el día uno). F1-01 pide
+dos ambientes, dev y staging, "definidos como configuración, sin credenciales en
+el repositorio".
+
+**Decisión.** `ambientes/dev.json` y `ambientes/staging.json` están en el
+repositorio y se revisan como cualquier cambio: puertos, orígenes permitidos,
+SSL, tamaño del pool, nivel de registro. Las credenciales no: cada archivo
+declara el **nombre** de la variable de entorno donde vive cada secreto, nunca
+su valor. `cargarConfiguracion()` falla al arrancar nombrando la variable que
+falta, y **no hay ambiente por defecto**: sin `PAGAYA_AMBIENTE` el proceso no
+arranca. Una prueba verifica que ningún archivo de ambiente contenga algo con
+forma de credencial.
+
+Un secreto cargado viaja envuelto en `Secreto`, que devuelve el nombre de la
+variable —no su valor— en cualquier intento de imprimirlo: texto, `JSON` o
+inspección. El registro de errores es el lugar más fácil donde se escapa una
+credencial.
+
+**Producción no existe todavía** y eso es deliberado: nace con el piloto
+(PRD-001 §18, Fase 5) y será un archivo más, sin una línea de código. Lo que el
+administrador configura **por local** —rotación del PIN (RF-A-12), umbrales de
+nivel (RF-A-07), plazos de escalamiento (PRD-001 §9), medios de pago habilitados
+(RF-A-18)— no vive acá sino en la base de datos: un local no es un ambiente, y
+cambiarle un umbral no puede exigir un despliegue.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Un `.env` por ambiente, en el repositorio | Mezcla en un archivo lo que se revisa con lo que no se puede ver. El día que alguien agrega una clave de Fintoc "solo para probar", queda en la historia de git para siempre. |
+| Solo variables de entorno, sin archivo de ambiente | La configuración se vuelve invisible: no hay dónde leer qué distingue staging de dev, ni cómo revisar ese cambio. Y un error de tipeo en un nombre de variable se descubre en producción. |
+| Un gestor de secretos (Vault, Secrets Manager) desde el día uno | Es el siguiente paso, no el primero: `process.env` es la interfaz que todos los gestores alimentan, así que adoptarlo después no cambia una línea de este código. |
+| Un ambiente por defecto ("si no hay variable, dev") | Cómodo hasta el día en que un proceso de staging arranca con la configuración de dev y escribe en la base equivocada. |
+
+### 8.5 AT-9 — `make verify` es la única puerta, y la CI corre el mismo comando
+
+**Qué lo exige.** El principio rector de `CLAUDE.md`: "está terminado cuando
+`make verify` pasa y pegas su salida". Si la CI corriera otra cosa, habría dos
+definiciones de terminado.
+
+**Decisión.** `make verify` corre, en orden y deteniéndose en el primer fallo:
+la convención de PRDs (el verificador que ya existía), el **lint** —que incluye
+la frontera de AT-5—, el **chequeo de tipos** y las **pruebas**. Agregar una
+verificación significa agregarla ahí, no en otro comando que alguien tiene que
+acordarse de correr. `.github/workflows/verificar.yml` corre `make verify` en
+cada PR y en cada push a main, y nada más.
+
+**Las pruebas contra PostgreSQL** son el único punto donde el equipo y la CI no
+corren lo mismo, y la diferencia está declarada: se omiten si no hay
+`PAGAYA_BD_URL` —diciéndolo en voz alta en la salida— y se vuelven
+**obligatorias** con `PAGAYA_EXIGIR_BD=1`, que la CI pone siempre junto a un
+PostgreSQL efímero. Así la puerta la puede correr cualquiera sin instalar una
+base de datos, y el verde de la CI no se puede obtener sin ella.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Que la CI corra su propia lista de pasos | Dos definiciones de "listo" que se desincronizan en el tercer mes, y un fallo de CI que no se puede reproducir en el equipo. |
+| Exigir Docker o PostgreSQL local para `make verify` | Una puerta que no todos pueden correr no es una puerta: deja de correrse. El contrato es más honesto al revés —omitir diciéndolo, y hacerlo obligatorio donde sí hay base de datos. |
+| Omitir las pruebas de base de datos también en la CI | Entonces el `CHECK` de AT-4 y el índice único de AT-3, que son las reglas que PRD-003 §5 pide que sean imposibles de violar, no estarían verificadas en ninguna parte. |
+| `make verify` en paralelo | Más rápido y menos legible: la salida se entrevera y el primer fallo deja de ser evidente. Se reconsidera cuando la verificación duela. |
+
+### 8.6 Qué no se decide en F1-01
+
+- **Marco web y biblioteca de WebSocket.** El proceso API responde `/salud` con
+  `node:http`. Lo decide F1-70, que es la tarea con el requisito que manda:
+  tiempo real en menos de 3 s (PRD-001 §14).
+- **Marco de interfaz y empaquetador de la web app**, y la **app del mesero en
+  React Native** con su empaquetador: `apps/web` existe hoy por su frontera, no
+  por su contenido, y `apps/mesero` todavía no existe. Los decide F1-30, que
+  tiene el requisito que los decide —carta usable en gama baja y con conexión
+  pobre—, y E6 para el mesero. El riesgo de estimación de F1-30 ya advierte que
+  ahí se juega la primera pantalla de la primera visita.
+- **Capa de consultas** (SQL a mano, constructor de consultas o ORM solo para
+  leer). Lo decide F1-02, que es la que escribe la capa única de acceso con
+  `local_id` que AT-1 exige.
+- **Nube, despliegue y observabilidad.** §7 ya los deja fuera; F1-01 solo deja
+  dos procesos que arrancan con su configuración y se apagan limpio.

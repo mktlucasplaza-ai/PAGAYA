@@ -1,0 +1,59 @@
+# La única puerta, corrida por la máquina: `make verify` en cada PR y en cada
+# push a main. Es el mismo comando que corre una persona en su equipo, con una
+# diferencia a favor: acá hay PostgreSQL de verdad, así que las pruebas de
+# integración no se pueden omitir (PAGAYA_EXIGIR_BD=1).
+name: Verificar
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Un push nuevo sobre la misma rama cancela la verificación anterior: lo que
+# importa es si el último commit pasa.
+concurrency:
+  group: verificar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pagaya
+          POSTGRES_PASSWORD: pagaya
+          POSTGRES_DB: pagaya_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PAGAYA_AMBIENTE: dev
+      # Credenciales de una base de datos efímera que vive y muere con este job.
+      PAGAYA_BD_URL: postgres://pagaya:pagaya@localhost:5432/pagaya_ci
+      PAGAYA_FIRMA_SESION: solo-para-integracion-continua
+      # Sin esto, una base de datos mal configurada haría que las pruebas de
+      # integración se omitan en silencio y el verde no significaría nada.
+      PAGAYA_EXIGIR_BD: "1"
+
+    steps:
+      # `fetch-depth: 0` porque la verificación de inmutabilidad de los PRDs
+      # compara contra origin/main: sin historia no hay con qué comparar.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: make verify
+        run: make verify

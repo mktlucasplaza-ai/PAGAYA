@@ -1,0 +1,16 @@
+{
+  "name": "@pagaya/repartidor",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Segundo proceso del despliegue (AT-1, AT-2): reparte el outbox. No importa ningún módulo de dominio; si lo necesitara, el evento está mal diseñado.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/config": "*",
+    "@pagaya/base-datos": "*",
+    "@pagaya/notificacion": "*"
+  }
+}

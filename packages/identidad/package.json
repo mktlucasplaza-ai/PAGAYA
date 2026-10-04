@@ -1,0 +1,17 @@
+{
+  "name": "@pagaya/identidad",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cuentas, OTP, sesiones y PAGAYA ID (RF-C-02, RF-C-25, PRD-003 §3).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/contrato": "*",
+    "@pagaya/base-datos": "*",
+    "@pagaya/auditoria": "*",
+    "@pagaya/notificacion": "*"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@pagaya/base-datos",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pool de PostgreSQL y migraciones. Es la capa única de acceso que AT-1 exige para filtrar local_id.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/config": "*",
+    "pg": "^8.13.1"
+  }
+}

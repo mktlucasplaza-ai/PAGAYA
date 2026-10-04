@@ -1,0 +1,20 @@
+{
+  "name": "@pagaya/pago",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Intentos de cobro, congelamiento y calcular_cuenta (AT-3, AT-4). Es el único módulo que conoce la interfaz de proveedor (PRD-002 §5.2, PRD-007 §2.1).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/contrato": "*",
+    "@pagaya/base-datos": "*",
+    "@pagaya/auditoria": "*",
+    "@pagaya/notificacion": "*",
+    "@pagaya/identidad": "*",
+    "@pagaya/comanda": "*",
+    "@pagaya/fidelizacion": "*"
+  }
+}

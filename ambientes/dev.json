@@ -1,0 +1,22 @@
+{
+  "ambiente": "dev",
+  "api": {
+    "puerto": 3000,
+    "origenes_permitidos": ["http://localhost:3000", "http://localhost:5173"]
+  },
+  "base_datos": {
+    "ssl": false,
+    "max_conexiones": 10
+  },
+  "repartidor": {
+    "intervalo_sondeo_ms": 1000,
+    "tope_reintentos": 5
+  },
+  "registro": {
+    "nivel": "debug"
+  },
+  "secretos": {
+    "url_base_datos": "PAGAYA_BD_URL",
+    "firma_sesion": "PAGAYA_FIRMA_SESION"
+  }
+}
