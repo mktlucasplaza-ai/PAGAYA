@@ -307,13 +307,13 @@ llegue el webhook.
 
 ## 6. Supuestos y preguntas abiertas
 
-Lo que aquí se decidió sin que lo decidiera un PRD. **S-1 es la única que es
-pregunta de producto**: no se puede cerrar en `docs/`, necesita un PRD nuevo. Las
+Lo que aquí se decidió sin que lo decidiera un PRD. **S-1 era la única pregunta
+de producto y ya la cerró el PRD-006**; se conserva la fila como registro. Las
 demás son valores por defecto técnicos y viven en configuración.
 
 | ID | Supuesto | Por qué, y qué pasa si se resuelve distinto |
 |---|---|---|
-| **S-1** | **El beneficiario del descuento es el participante con `beneficio_activo` y mayor porcentaje presente en la comanda, pague él o no.** Se aplica **un solo** descuento por comanda (no se suman niveles). | Hay tensión real en los PRDs vigentes: PRD-002 §2.2 dice *"el % del nivel vigente del cliente que paga"*, mientras PRD-003 §5 y PRD-005 §3 hablan de *"un participante con `beneficio_activo`"*, y RF-C-14 permite que pague cualquier comensal. Se adopta la lectura de presencia porque es la del PRD más reciente y la del anexo (el descuento de Camila se explica por su sesión activa, no por quién paga). Si se resuelve como "solo el que paga", cambia una línea de `calcular_cuenta` y el campo `participante_beneficiario_id` pasa a ser siempre el pagador: la arquitectura no cambia, el resultado en la mesa sí. **Queda propuesta para el próximo PRD.** |
+| **S-1** | **Cerrado por [PRD-006](../prds/PRD-006-beneficiario-del-descuento-por-presencia.md):** el beneficiario es el participante con `beneficio_activo` y mayor porcentaje presente en la comanda, pague él o no; un solo descuento por comanda, decidido al congelar. | Era una contradicción entre PRD-002 §2.2 ("el cliente que paga") y PRD-003 §5 / PRD-005 §3 ("un participante con `beneficio_activo`"). PRD-006 adopta presencia y agrega al pago `beneficiario_id`, `pagador_id`, `nivel_aplicado`, `porcentaje_aplicado` y `monto_descuento_calculado` como instantánea, más un tope opcional por comanda (RF-A-07 mod.) y máximo un descuento por cliente por día. `calcular_cuenta` elige al beneficiario al congelar (AT-3) y la restricción de AT-4 pasa a referenciar `beneficiario_id`. |
 | S-2 | Vencimiento del congelamiento: **15 minutos**, configurable por local. | Ningún PRD fija el plazo. Muy corto, se cancelan pagos con 3-D Secure lento; muy largo, la mesa queda bloqueada para el mesero. Se mide en el piloto. |
 | S-3 | Plazos de escalamiento al administrador (la "X minutos" de PRD-001 §9): **3 min** para llamado de asistencia, **5 min** para productos agregados. | PRD-001 §9 los deja configurables sin fijar valor. Son configuración por local; se calibran con la operación real. |
 | S-4 | Entrega **al menos una vez**, no exactamente una vez. | No existe "exactamente una vez" de punta a punta con un proveedor de push de terceros. Se compensa con idempotencia del consumidor y con la lista en vivo como fuente de verdad (PRD-001 §9). |
