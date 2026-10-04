@@ -177,6 +177,13 @@ escribiendo un PRD completo, y de juez el modelo por defecto de `codex`
 | Reloj | **5,5 minutos** de punta a punta; los candidatos corren en paralelo, así que N=4 no tarda el doble |
 | Total | **≈ 1,9 USD por corrida de dos candidatos** |
 
+> Esos números se midieron cuando `make verify` era solo
+> `scripts/verify_prds.py`. Desde F1-01, `verify` además instala dependencias y
+> corre lint, tipos y pruebas: cada candidato que lo corra —y el rubric premia
+> que lo corra— se lleva varios minutos de reloj y necesita red para el `npm
+> ci`. El costo en tokens casi no se mueve, el reloj sí. Vuelve a medir antes de
+> citar estas cifras para una tanda grande.
+
 Regla de bolsillo: **~0,9 USD por candidato con `sonnet`** en una tarea de este
 tamaño; con `opus` hay que contar entre tres y cinco veces eso. El expediente que
 recibe el juez crece con el largo de la sesión, no con el número de candidatos:

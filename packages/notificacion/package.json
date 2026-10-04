@@ -1,0 +1,15 @@
+{
+  "name": "@pagaya/notificacion",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dueña del outbox (AT-2). No importa ningún módulo de dominio a propósito: el filtro de RF-M-02 vive en el productor, no acá.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/base-datos": "*",
+    "@pagaya/contrato": "*"
+  }
+}

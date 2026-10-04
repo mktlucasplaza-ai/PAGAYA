@@ -1,0 +1,19 @@
+{
+  "name": "@pagaya/comanda",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ítems, participantes y comanda.version (AT-3). No importa pago: la comanda no conoce la pasarela; pago la importa a ella.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/contrato": "*",
+    "@pagaya/base-datos": "*",
+    "@pagaya/auditoria": "*",
+    "@pagaya/notificacion": "*",
+    "@pagaya/identidad": "*",
+    "@pagaya/mesa": "*"
+  }
+}

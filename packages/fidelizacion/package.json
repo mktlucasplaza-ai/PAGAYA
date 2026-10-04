@@ -1,0 +1,17 @@
+{
+  "name": "@pagaya/fidelizacion",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Visitas, niveles y beneficio_activo derivado (AT-4, regla 3). No importa comanda ni pago: beneficio_activo se deriva, no se concede.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/contrato": "*",
+    "@pagaya/base-datos": "*",
+    "@pagaya/auditoria": "*",
+    "@pagaya/identidad": "*"
+  }
+}

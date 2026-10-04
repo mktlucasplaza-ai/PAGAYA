@@ -1,0 +1,14 @@
+{
+  "name": "@pagaya/auditoria",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Todo módulo de dominio escribe auditoría en su misma transacción (F1-04). Si auditoria importara un módulo de dominio habría un ciclo con todos.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@pagaya/nucleo": "*",
+    "@pagaya/base-datos": "*"
+  }
+}

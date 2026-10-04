@@ -15,6 +15,36 @@ Este producto se define y evoluciona **por PRDs**. Toda la definición vive en
   que abre con la sección *"Cambios en esta versión"*.
 - Las reglas de versionado y el índice están en [`prds/README.md`](prds/README.md).
 
+## El repositorio
+
+```
+prds/          el alcance. No se edita: cada cambio es un PRD nuevo
+docs/          ejecución: backlog, arquitectura y decisiones técnicas
+ambientes/     dev.json y staging.json. Nombres de secretos, nunca valores
+packages/      los módulos de arquitectura.md AT-1, con frontera explícita
+apps/          api, repartidor y web app
+fronteras.json qué puede importar cada módulo, y por qué
+scripts/       los verificadores
+```
+
+## Cómo correr
+
+Hace falta **Node 22.18 o superior** y **python3**. Nada más: no hay paso de
+compilación, ni empaquetador, ni marco de pruebas.
+
+```sh
+make verify     # la única puerta: PRDs + lint + tipos + pruebas
+make migrar     # aplica las migraciones al ambiente de PAGAYA_AMBIENTE
+```
+
+`make verify` instala las dependencias si hace falta. Las pruebas que necesitan
+PostgreSQL se omiten —diciéndolo— si no hay `PAGAYA_BD_URL`, y son obligatorias
+en integración continua. Para trabajar en local: `cp .env.ejemplo .env` y
+[`ambientes/README.md`](ambientes/README.md).
+
+Las decisiones técnicas, con la alternativa que se descartó y por qué, están en
+[`docs/arquitectura.md`](docs/arquitectura.md).
+
 ## Roles
 
 | Rol | Qué hace |
