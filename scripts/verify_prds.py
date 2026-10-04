@@ -14,6 +14,8 @@ Comprueba, y falla con código 1 si algo no se cumple:
   5. Inmutabilidad: ningún PRD que ya exista en la referencia base cambió.
   6. El backlog en docs/ no cita IDs de requisito que no existan en los PRDs.
 """
+from __future__ import annotations
+
 import argparse
 import re
 import subprocess
