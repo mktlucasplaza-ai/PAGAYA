@@ -1,0 +1,7 @@
+# Las corridas de evals/ dejan transcripts, diffs y expedientes pesados; se
+# versiona solo el .json de resumen de cada corrida.
+evals/resultados/*
+!evals/resultados/*.json
+
+__pycache__/
+*.pyc
