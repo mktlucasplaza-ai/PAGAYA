@@ -15,13 +15,13 @@
 
 **Motivo del cambio:** <por qué se escribe este PRD>
 
-**Se agregó**
+### Se agregó
 - <requisito, flujo o regla nueva, con su ID>
 
-**Se modificó**
+### Se modificó
 - <ID del requisito> — antes: <...> / ahora: <...>
 
-**Se eliminó**
+### Se eliminó
 - <ID del requisito> — motivo: <...>
 
 **Sin cambios:** todo lo no mencionado aquí sigue vigente según el PRD anterior.
