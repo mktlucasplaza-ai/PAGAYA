@@ -46,8 +46,9 @@ describe("el segundo proceso arranca y se apaga", () => {
     assert.equal(pasadas, alDetener, "después de detener() no debe seguir repartiendo");
   });
 
-  test("una pasada que falla no mata el proceso", async () => {
+  test("una pasada que falla se reporta y no mata el proceso", async () => {
     let intentos = 0;
+    const reportados: string[] = [];
     const repartidor = crearRepartidor(
       { ...config(), repartidor: { intervaloSondeoMs: 50, topeReintentos: 5 } },
       {
@@ -55,11 +56,13 @@ describe("el segundo proceso arranca y se apaga", () => {
           intentos += 1;
           throw new Error("el proveedor de push no responde");
         },
+        registrar: (mensaje) => reportados.push(mensaje),
       },
     );
     repartidor.iniciar();
     await new Promise((listo) => setTimeout(listo, 180));
     await repartidor.detener();
     assert.ok(intentos >= 2, "debe seguir intentando después de un fallo");
+    assert.equal(reportados.length, intentos, "cada fallo se reporta una vez");
   });
 });

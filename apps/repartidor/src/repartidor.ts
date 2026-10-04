@@ -22,6 +22,13 @@ export type Pasada = () => Promise<number>;
 export type DependenciasRepartidor = {
   /** F1-70 reemplaza esto por la lectura real del outbox. */
   readonly pasada?: Pasada;
+  /**
+   * Dónde se reporta una pasada que falló. Se inyecta en lugar de escribir a
+   * `console` directo porque un fallo del repartidor es un dato de operación
+   * —AT-2 lo vigila contra el presupuesto de 3 s— y porque así una prueba puede
+   * comprobar que se reportó sin ensuciar la salida de `make verify`.
+   */
+  readonly registrar?: (mensaje: string, error: unknown) => void;
 };
 
 export type Repartidor = {
@@ -38,6 +45,11 @@ export function crearRepartidor(
   dependencias: DependenciasRepartidor = {},
 ): Repartidor {
   const pasada = dependencias.pasada ?? sinOutboxTodavia;
+  const registrar =
+    dependencias.registrar ??
+    ((mensaje: string, error: unknown) => {
+      console.error(mensaje, error);
+    });
   let temporizador: NodeJS.Timeout | undefined;
   let enCurso: Promise<unknown> = Promise.resolve();
   let pasadas = 0;
@@ -51,7 +63,7 @@ export function crearRepartidor(
             pasadas += 1;
           })
           .catch((error: unknown) => {
-            console.error("repartidor: la pasada falló", error);
+            registrar("repartidor: la pasada falló", error);
           });
       }, config.repartidor.intervaloSondeoMs);
       temporizador.unref();
