@@ -33,7 +33,8 @@ Para redactar un PRD nuevo, copiar `_plantilla-prd.md`.
 | [PRD-003](PRD-003-gate-de-piloto-y-seguridad-del-pagaya-id.md) | Gate de piloto y seguridad del PAGAYA ID | Modificado por PRD-004 | 2026-09-26 |
 | [PRD-004](PRD-004-registro-obligatorio-para-pedir.md) | Registro obligatorio para pedir | Modificado por PRD-005 | 2026-09-26 |
 | [PRD-005](PRD-005-primer-pedido-por-el-mesero.md) | El mesero también puede tomar el primer pedido | Modificado por PRD-006 | 2026-09-26 |
-| [PRD-006](PRD-006-beneficiario-del-descuento-por-presencia.md) | El descuento por nivel se aplica por presencia, no por quien paga | Vigente | 2026-10-04 |
+| [PRD-006](PRD-006-beneficiario-del-descuento-por-presencia.md) | El descuento por nivel se aplica por presencia, no por quien paga | Modificado por PRD-007 | 2026-10-04 |
+| [PRD-007](PRD-007-fintoc-y-kushki-como-pasarelas.md) | Fintoc y Kushki como pasarelas de pago | Vigente | 2026-10-04 |
 
 ## Anexos
 

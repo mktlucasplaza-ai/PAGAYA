@@ -326,8 +326,13 @@ demás son valores por defecto técnicos y viven en configuración.
 - **Proveedor concreto de push y de SMS**, y el plan de nube y despliegue: están
   detrás de una interfaz (AT-1) justamente para no decidirlos hoy. El canal de
   OTP ya es configurable por exigencia de PRD-004 §3.
-- **Enrutamiento entre MercadoPago y Kushki**: ya está decidido en PRD-002 §5.2 y
-  su habilitación depende de **G-2**; aquí no se agrega nada.
+- **Enrutamiento entre Fintoc y Kushki**: ya está decidido en **PRD-007 §2.1**
+  (Fintoc principal, Kushki para Webpay Plus y como respaldo; MercadoPago queda
+  descartado), sobre la interfaz única de proveedor que exige PRD-002 §5.2. Su
+  habilitación depende de **G-2**, reescrita en PRD-007 §7; aquí no se agrega
+  nada. El plazo de confirmación de la transferencia y el conflicto entre un
+  webhook tardío y el cobro manual los define PRD-007 §2.4 y RF-A-19, y se
+  resuelven con el mecanismo que §5 ya describe.
 - **Boleta electrónica** (PRD-002 §5.5), **división de cuenta** y **KDS**
   (PRD-001 §5.2 y §13): fuera del MVP. El registro de pagos sí guarda lo que
   PRD-002 §5.5 pide para poder emitir después.
