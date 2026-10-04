@@ -1,0 +1,45 @@
+# Configuración compartida de Conductor para PAGAYA. Aplica a todo workspace que
+# se cree desde este repo. Los ajustes personales (modelo por defecto, etc.) van
+# en ~/.conductor/settings.toml de cada persona, no aquí.
+
+[scripts]
+# Cada workspace nace verificado: si main no pasa `make verify`, no se trabaja
+# sobre él.
+setup = "make verify"
+
+[scripts.run.verify]
+command = "make verify"
+default = true
+icon = "check"
+
+[git]
+# El PR mezclado archiva el workspace y borra su rama. Junto con la opción
+# "Automatically delete head branches" de GitHub, nunca hay que decidir qué rama
+# borrar.
+archive_on_merge = true
+delete_branch_on_archive = true
+worktree_push_auto_setup_remote = true
+
+[prompts]
+# Se agrega a toda sesión de agente en este repo, sea Claude Code o Codex.
+general = """
+Antes de cualquier cosa lee CLAUDE.md en la raíz y sigue su orden de lectura y
+sus playbooks. Trabaja en español. Termina siempre con la salida de `make verify`.
+"""
+
+# Lo que corre el botón Review: la lectura adversarial del Playbook A, paso 7.
+code_review = """
+Lectura adversarial. Lee solo prds/README.md, las secciones "## 0." de cada PRD
+y el PRD vigente, y después el diff. Responde citando archivo y línea:
+(1) ¿el cambio contradice algún RF o sección vigente que no nombre en su "## 0."
+o en su justificación? (2) ¿toma decisiones sin marcarlas como decisión o
+supuesto? (3) ¿reusa algún ID con otro significado? No propongas rediseños;
+señala problemas.
+"""
+
+# Lo que corre el botón Create PR.
+create_pr = """
+Título en español, una línea: qué decisión cierra o qué entrega. Cuerpo: qué
+cambió (archivos), salida completa de `make verify`, supuestos tomados y dónde
+quedaron escritos, qué queda abierto.
+"""

@@ -1,0 +1,54 @@
+# Barrido semanal de ramas que ya no aportan nada: borra una rama solo si todo su
+# contenido ya está en main, no tiene un PR abierto y no está en el mismo commit
+# que main (un workspace recién creado). Todo lo demás se conserva y se lista con
+# el motivo en el resumen de la ejecución.
+name: Limpiar ramas ya mezcladas
+
+on:
+  schedule:
+    - cron: "0 12 * * 1" # lunes, 09:00 en Chile
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  limpiar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Borrar ramas cuyo contenido completo ya está en main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch --prune origin
+          base=origin/main
+          tip_main=$(git rev-parse "$base")
+          echo "## Limpieza de ramas" >> "$GITHUB_STEP_SUMMARY"
+
+          for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin \
+                       | grep -v -E '^origin/(HEAD|main)$'); do
+            rama="${ref#origin/}"
+
+            if [ "$(git rev-parse "$ref")" = "$tip_main" ]; then
+              echo "- conservo \`$rama\`: está en el mismo commit que main (workspace nuevo)" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            if ! git merge-base --is-ancestor "$ref" "$base"; then
+              n=$(git rev-list --count "$base..$ref")
+              echo "- conservo \`$rama\`: tiene $n commit(s) que main no tiene" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            if [ "$(gh pr list --head "$rama" --state open --json number --jq 'length')" != "0" ]; then
+              echo "- conservo \`$rama\`: tiene un PR abierto" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+
+            git push origin --delete "$rama"
+            echo "- **borré** \`$rama\`: todo su contenido ya estaba en main y no tenía PR abierto" >> "$GITHUB_STEP_SUMMARY"
+          done
