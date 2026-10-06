@@ -1,12 +1,12 @@
 /**
  * Núcleo: lo que todos los módulos comparten y nadie debería definir dos veces.
  *
- * No hay reglas de negocio acá, ni en ningún paquete de esta entrega: F1-01 es
- * la fundación. Lo que sí hay son las tres piezas que la fundación necesita
- * para que los módulos siguientes no improvisen cada uno la suya: un error con
- * código, un envoltorio de secreto que no se filtra a los registros y un reloj
- * inyectable.
+ * No hay reglas de negocio acá. Lo que hay son las piezas que los módulos
+ * necesitan para no improvisar cada uno la suya: un error con código, un
+ * envoltorio de secreto que no se filtra a los registros, un reloj inyectable y
+ * una fuente de azar inyectable.
  */
+import { randomBytes } from "node:crypto";
 
 /**
  * Códigos de error. Son parte del contrato de operación: PRD-003 §5 y
@@ -16,6 +16,7 @@
 export type CodigoError =
   | "configuracion_invalida"
   | "migracion_invalida"
+  | "sesion_invalida"
   | "no_implementado";
 
 /** Error con código estable. `detalle` es para el humano, `codigo` para la máquina. */
@@ -81,6 +82,39 @@ export const relojDelSistema: Reloj = {
 /** Reloj fijo para pruebas. */
 export function relojFijo(instante: Date): Reloj {
   return { ahora: () => new Date(instante.getTime()) };
+}
+
+/**
+ * Fuente de azar inyectable, por el mismo motivo que el reloj: el azar es un
+ * insumo del dominio —el token de una sesión (F1-03), el PIN de mesa (F1-12),
+ * el QR personal de 60 s (RF-C-20)— y una prueba no puede verificar que dos
+ * tokens no se repitan si no puede fijar de dónde salen.
+ *
+ * Que sea un puerto también deja en un solo lugar la única fuente aceptable:
+ * `randomBytes`. Un `Math.random()` suelto en un módulo de dominio sería un
+ * token adivinable y nadie lo notaría al revisar el código.
+ */
+export type FuenteAleatoria = {
+  bytes(cantidad: number): Uint8Array;
+};
+
+export const aleatorioDelSistema: FuenteAleatoria = {
+  bytes: (cantidad) => randomBytes(cantidad),
+};
+
+/**
+ * Fuente determinista para pruebas: cada llamada devuelve un bloque distinto
+ * del anterior. No es azar y no pretende serlo; sirve para que una prueba pueda
+ * afirmar que dos sesiones no comparten token.
+ */
+export function aleatorioFijo(semilla = 0): FuenteAleatoria {
+  let llamada = semilla;
+  return {
+    bytes: (cantidad) => {
+      llamada += 1;
+      return Uint8Array.from({ length: cantidad }, (_, i) => (llamada * 31 + i) % 256);
+    },
+  };
 }
 
 /**
