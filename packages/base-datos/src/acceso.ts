@@ -6,7 +6,7 @@
  * security de PostgreSQL. El aislamiento no puede depender de que nadie olvide
  * un `WHERE`"— sobre PRD-001 §13 (multi-tenant desde el día uno) y PRD-001 §14
  * (acceso limitado a la mesa y al personal del local). La decisión y sus
- * alternativas están en docs/arquitectura.md §9 (AT-11).
+ * alternativas están en docs/arquitectura.md §10 (AT-13).
  *
  * La forma: no hay consulta fuera de una transacción, y no hay transacción sin
  * decir desde dónde se mira. Son tres entradas y ninguna más:

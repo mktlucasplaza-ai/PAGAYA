@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 (§9, el aislamiento por local, agregada el 2026-10-06) |
+| **Fecha** | 2026-10-04 (§9, la identidad, y §10, el aislamiento por local, agregadas el 2026-10-06) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -35,7 +35,7 @@ Debajo de las cuatro está la **fundación del repositorio** (§8): el monorepo 
 convierte la frontera de AT-1 en un dato verificable, las migraciones donde se
 escriben las invariantes de AT-2, AT-3 y AT-4, los ambientes y la puerta de
 verificación. No es una quinta decisión del mismo tipo: es dónde viven las otras
-cuatro. Y debajo de todo está el **aislamiento por local** (§9): la mitad de
+cuatro. Y **debajo de todo** está el aislamiento por local (§10): la mitad de
 AT-1 que ninguna de las otras tres puede suponer resuelta, porque una invariante
 de dinero que se cumple sobre las filas del local equivocado no es una
 invariante.
@@ -43,6 +43,16 @@ invariante.
 El hilo común: **las reglas que involucran dinero o identidad no viven en la
 interfaz**. Viven en una transacción de base de datos, porque es el único lugar
 donde "imposible" significa imposible (PRD-003 §5).
+
+Y **sobre** las cuatro está la identidad (§9): AT-10 y AT-11 no agregan una regla
+de dinero, deciden quién llega hasta una. Van después porque AT-11 solo es
+posible con la frontera de AT-5 ya verificada — es la que la obliga a decidir
+sobre la comanda sin importarla.
+
+Las dos últimas se tocan en un punto y está escrito en los dos lados: §9.3 deja
+a las tablas de identidad **fuera** del `local_id` obligatorio —una persona no
+pertenece a un local— y §10.1 es donde esa excepción se escribe, en el registro
+que la migración 0002 crea para que pedir una excepción sea un acto visible.
 
 ---
 
@@ -317,10 +327,11 @@ llegue el webhook.
 ## 6. Supuestos y preguntas abiertas
 
 Lo que aquí se decidió sin que lo decidiera un PRD. **S-1 era una pregunta de
-producto y ya la cerró el PRD-006**; se conserva la fila como registro. **S-9 es
-la otra**, y sigue abierta: toca qué cuenta como visita, así que cerrarla
-distinto es un PRD. Las demás son valores por defecto técnicos y viven en
-configuración.
+producto y ya la cerró el PRD-006**; se conserva la fila como registro. Casi
+todas las demás son valores por defecto técnicos que viven en configuración;
+las excepciones son dos y están marcadas: **S-9**, que no es un número sino la
+lectura de dos requisitos que dicen cosas distintas, y **S-11**, que toca qué
+cuenta como visita. Las dos dicen qué las reabriría como PRD.
 
 | ID | Supuesto | Por qué, y qué pasa si se resuelve distinto |
 |---|---|---|
@@ -332,8 +343,10 @@ configuración.
 | S-6 | **Producción se agrega cuando llegue el piloto**, como un archivo más en `ambientes/` (§8.4). En Fase 1 existen solo dev y staging. | F1-01 pide dos ambientes; ningún PRD dice cuándo nace el tercero. PRD-001 §18 pone el piloto en la Fase 5. Si hiciera falta antes, es un archivo y los secretos del proveedor: no cambia código. |
 | S-7 | **PostgreSQL 16** en integración continua; la versión mínima soportada es **13**, porque `gen_random_uuid()` es parte del motor desde ahí y así ninguna migración necesita una extensión ni superusuario (§8.3). | Ningún PRD fija la versión del motor. Si el proveedor de staging obliga a una versión menor, vuelve la extensión `pgcrypto` y con ella el permiso de superusuario en el alta de la base. |
 | S-8 | **Node 22.18 o superior** como plataforma, y TypeScript ejecutado sin compilar (§8.2). | Ningún PRD fija el entorno de ejecución. Si un proveedor de despliegue obliga a una versión anterior, vuelve un paso de transpilación: cambia el `Makefile` y el despliegue, no el código. |
-| S-9 | **El día operativo del local es su día calendario** en su zona horaria (§9.4). | Ningún PRD lo dice y tres reglas dependen de ello: "una visita por día por local" (PRD-001 §8), "ventas del día" (RF-A-06) y "un descuento por cliente por día por local" (PRD-006 §2, regla 7). Un restaurante que cierra a las 02:00 parte la noche en dos días, y la visita de quien pagó a las 01:30 cae al día siguiente. Si eso importa en el piloto, el arreglo es un corte configurable por local y **es un PRD**, no un parche: cambia qué cuenta como visita. |
-| S-10 | **El mismo rol conecta y migra**, y no es superusuario (§9.1). | Ningún PRD habla de roles de base de datos. Lo que sí es innegociable es que el rol que conecta no sea superusuario: un superusuario esquiva la row level security y el aislamiento entre locales deja de existir en silencio. Separar el rol que migra del que sirve es mejor y es un `GRANT` en el alta de la base, no una migración: la migración 0002 le concede `pagaya_app` a quien la corre. |
+| S-9 | El **mesero ve la comanda solo de las mesas que tiene asignadas** en el turno; el administrador, de todas las del local (§9.2). | PRD-001 §14 dice "el personal del local" sin distinguir, y RF-M-01 con PRD-001 §4.2 dicen "solo las mesas a su cargo". Se adopta la lectura más estricta de las dos, que además es la que hace falta para que el escalamiento al administrador de PRD-001 §9 tenga sentido: una mesa sin asignación no la ve ningún mesero, y por eso se escala (F1-73). Si la operación real necesita que un mesero cubra una mesa ajena, cambia **quién llena `meserosAsignados`** —y eso lo decide `mesa`, con RF-A-04 reasignando en caliente—, no la regla. Si tuviera que cambiar la regla, sería un PRD. El caso concreto que esto deja sobre la mesa de **F1-14**: un mesero abre una mesa de otra zona (RF-M-17) y con esta regla no vería la comanda que acaba de crear. Lo resuelve esa tarea decidiendo si abrir una mesa implica quedar asignado a ella; acá solo se declara que el acceso se lee de la asignación y de ningún otro lado. |
+| S-10 | Vigencia de sesión: **cliente 180 días deslizantes**, **mesero 16 h** y **admin 12 h** no deslizantes, **sin cuenta 12 h** deslizantes (§9.1). | PRD-001 §14 exige "sesiones por rol" y PRD-004 §3 exige que la del cliente sea persistente, pero ningún PRD fija los números. La forma —deslizante para el cliente, de una jornada para el personal— es la decisión; los plazos son configuración y se calibran con la operación. Muy corto en el cliente, se gasta OTP de más, que es el costo variable que PRD-004 §3 quiere bajar; muy largo en el personal, un teléfono olvidado en la barra queda con sesión abierta. |
+| S-11 | **El día operativo del local es su día calendario** en su zona horaria (§10.4). | Ningún PRD lo dice y tres reglas dependen de ello: "una visita por día por local" (PRD-001 §8), "ventas del día" (RF-A-06) y "un descuento por cliente por día por local" (PRD-006 §2, regla 7). Un restaurante que cierra a las 02:00 parte la noche en dos días, y la visita de quien pagó a las 01:30 cae al día siguiente. Si eso importa en el piloto, el arreglo es un corte configurable por local y **es un PRD**, no un parche: cambia qué cuenta como visita. |
+| S-12 | **El mismo rol conecta y migra**, y no es superusuario (§10.1). | Ningún PRD habla de roles de base de datos. Lo que sí es innegociable es que el rol que conecta no sea superusuario: un superusuario esquiva la row level security y el aislamiento entre locales deja de existir en silencio. Separar el rol que migra del que sirve es mejor y es un `GRANT` en el alta de la base, no una migración: la migración 0002 le concede `pagaya_app` a quien la corre. |
 
 ---
 
@@ -567,13 +580,222 @@ base de datos, y el verde de la CI no se puede obtener sin ella.
   ahí se juega la primera pantalla de la primera visita.
 - **Capa de consultas** (SQL a mano, constructor de consultas o ORM solo para
   leer). Lo decide F1-02, que es la que escribe la capa única de acceso con
-  `local_id` que AT-1 exige. **Ya decidido:** §9, AT-11.
+  `local_id` que AT-1 exige. **Ya decidido:** §10, AT-13.
 - **Nube, despliegue y observabilidad.** §7 ya los deja fuera; F1-01 solo deja
   dos procesos que arrancan con su configuración y se apagan limpio.
 
 ---
 
-## 9. El aislamiento por local (F1-02)
+## 9. La identidad y el acceso a la comanda (F1-03)
+
+Quién es quien pide, cuánto le dura la sesión y qué puede ver. Las exige
+**F1-03** del [backlog](backlog-fase-1.md) ("Roles (cliente, mesero, admin) y
+sesiones; acceso a la comanda limitado a la mesa y al personal del local",
+PRD-001 §14). Son dos decisiones:
+
+```
+AT-10 Sesión ─── un registro revocable; el token no dice nada de sí mismo
+AT-11 Acceso ─── la regla recibe un descriptor de la comanda, no la comanda
+```
+
+No son una quinta y una sexta decisión del mismo peso que AT-1 a AT-4: esas
+gobiernan el dinero, estas gobiernan quién llega hasta él. Van después porque
+AT-11 solo es posible con la frontera de AT-5 ya verificada.
+
+**F1-03 llega antes que F1-02 en este repositorio**, y el backlog la hace
+depender de ella. La consecuencia está asumida y es visible en el código:
+F1-03 entrega las **reglas y la mecánica puras** —se prueban sin PostgreSQL— y
+el **puerto** `RepositorioSesiones`. No crea ninguna tabla: el `local_id`
+obligatorio, el *row level security* y la capa única de acceso son de F1-02
+(AT-1), y adelantarlos acá sería decidir su esquema desde otra tarea. Lo que
+F1-03 sí le deja decidido es qué tiene que guardar y con qué excepción (§9.3).
+
+### 9.1 AT-10 — La sesión es un registro revocable, y el token no dice nada
+
+**Qué lo exige.**
+
+- **RF-C-02 (mod. por PRD-004 §3)**: "sin contraseña, con sesión persistente".
+  PRD-004 §3 lo dice completo: la sesión "queda persistente en el dispositivo y
+  se recupera con OTP. Una contraseña en un restaurante es una barrera sin
+  beneficio".
+- **PRD-001 §14**: "OTP con expiración y límite de intentos; **sesiones por
+  rol**". No hay una vigencia única: la del cliente dura lo que dure su relación
+  con el local, la del personal dura un turno.
+- **RF-C-24 y PRD-004 §2.2**: unirse a la mesa, ver la carta y ver la comanda no
+  exigen registro. Existe entonces una sesión **sin cuenta**, y existe el
+  instante en que se convierte en una con cuenta (F1-23).
+- **RF-C-21** ("No es mi mesa"), **F1-15** (al cerrarse la sesión de mesa expira
+  el acceso de todos los dispositivos) y **RF-C-23** (eliminar la cuenta): hay
+  que poder apagar un acceso **ahora**, no al vencer un plazo.
+
+**Decisión.**
+
+- **Una sesión es una fila, no un token firmado.** Lleva titular, dispositivo,
+  cuándo se abrió, última actividad, cuándo vence y cuándo se revocó.
+- **El token nunca se guarda:** se guarda su `sha256`. El token en claro existe
+  una sola vez, cuando se emite, y vive en el dispositivo. Una tabla de sesiones
+  en claro es un archivo de contraseñas en claro, y PRD-001 §14 pide cifrado en
+  reposo.
+- **Vigencia por titular** (los plazos son S-10): cliente **deslizante** —se
+  empuja con el uso, y eso es exactamente lo que "persistente" significa en
+  PRD-004 §3—; personal **no deslizante**, una jornada, porque un teléfono de
+  salón se presta y se queda arriba de la barra; sin cuenta, una comida.
+- **Promover, no reabrir.** El dispositivo que se sentó sin cuenta y termina el
+  registro (F1-23) **conserva el identificador de su sesión**: es lo que hace que
+  el carro armado y el participante que ya está en la comanda sobrevivan al
+  registro sin duplicarse. Y **rota el token**, porque el token viejo nació sin
+  cuenta y pudo llegar al dispositivo por un camino que nadie controla; heredarlo
+  sería dejar que quien lo plantó herede la cuenta. Es la misma lógica de
+  PRD-003 §3.1: un token que ya circuló no se reusa.
+- **Toda sesión nace en `abrirSesion` o en `promoverACuenta`.** F1-20 y F1-21
+  implementan el OTP y el registro contra la frontera que F1-03 deja declarada
+  (`ServicioIdentidad`), y terminan ahí: si hubiera una segunda forma de empezar
+  una sesión, la política de vigencia de PRD-001 §14 se podría esquivar.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Token firmado sin estado (JWT) | No se puede revocar. RF-C-21, RF-C-23 y F1-15 exigen apagar un acceso en el momento; con un token sin estado habría que mantener una lista de revocados, que es la tabla que el JWT venía a evitar, más el token. |
+| Contraseña, aunque sea opcional | PRD-004 §3 la descarta por escrito, y RF-C-25 da 40 segundos para todo el registro. Una contraseña opcional es igual de caro de sostener (recuperación, rotación, fuga) y no la usaría nadie. |
+| Guardar el token en claro para poder buscarlo | Es lo mismo que guardar contraseñas en claro. La huella se busca igual de rápido y una fuga de la tabla no entrega ninguna sesión. |
+| Una sola vigencia para todos los roles | Contradice "sesiones por rol" (PRD-001 §14) y obliga a elegir entre una sesión de cliente que caduca —y lo manda al OTP cada vez, el costo variable que PRD-004 §3 quiere bajar— o una de mesero que no caduca nunca. |
+| Abrir una sesión nueva al terminar el registro | Pierde el carro y duplica el participante en la comanda, que es el riesgo que el backlog le cuelga a F1-23. |
+| Sesión atada al número de mesa | La sesión del cliente es suya y sobrevive a la mesa (PRD-004 §3). Lo que está atado a la mesa es el **acceso a esa comanda**, y eso lo decide AT-11 sin tocar la sesión. |
+
+**Consecuencias.**
+
+- Autenticar es una lectura por petición. Renovar es una **escritura**, así que
+  `renovarSesion` existe aparte y quien conecte esto a HTTP (F1-70) decide cada
+  cuánto la llama: llamarla en cada petición es escribir en la base en cada
+  petición.
+- La sesión del cliente, al ser deslizante y sin tope absoluto, no caduca
+  mientras se use. Es deliberado y es lo que PRD-004 §3 pide; lo que la cierra
+  es la revocación (RF-C-23), no el calendario.
+- El azar pasa a ser un insumo inyectable (`FuenteAleatoria` en `@pagaya/nucleo`,
+  por el mismo motivo que el reloj): sin eso, una prueba no puede afirmar que dos
+  tokens no se repiten, y un `Math.random()` suelto en un módulo de dominio sería
+  un token adivinable que nadie nota al revisar el código. Lo reusan el PIN de
+  mesa (F1-12) y el QR personal de 60 s (RF-C-20).
+
+### 9.2 AT-11 — El acceso a la comanda se decide con un descriptor, no importando la comanda
+
+**Qué lo exige.** **PRD-001 §14**, textual: "acceso a la comanda limitado **a la
+mesa y al personal del local**". Son dos puertas y ninguna es el rol a secas:
+
+- **La mesa:** quien está sentado en esa sesión de mesa, con cuenta o sin ella
+  (RF-C-24, PRD-004 §2.2: ver la comanda no exige registro), y solo mientras la
+  sesión de mesa esté abierta (PRD-001 §16 pide "expirar el acceso al cerrarse";
+  PRD-002 §3.4 rota el PIN ahí mismo).
+- **El personal del local:** el administrador ve el salón completo (RF-A-05); el
+  mesero ve solo las mesas a su cargo (RF-M-01, PRD-001 §4.2) — es S-9.
+- Y una tercera que ningún PRD escribe porque no hace falta: nadie ve la comanda
+  de otro local (PRD-001 §13, multi-tenant desde el día uno).
+
+Más la restricción estructural: **`fronteras.json` prohíbe que `identidad`
+importe `mesa` y `comanda`** (AT-5), porque la importan ellas a ella.
+
+**Decisión.**
+
+- La regla es **una función pura** en `@pagaya/identidad`:
+  `puedeVerComanda({ sesion, comanda, ahora })`. No consulta nada.
+- Recibe un **descriptor**, `ComandaParaAcceso`, que nombra exactamente los
+  cuatro hechos que la decisión necesita: el local, si la sesión de mesa sigue
+  abierta, quiénes están sentados y a qué meseros les toca esa mesa. Los dos
+  últimos los tienen `comanda` y `mesa`, que son sus dueñas y pueden importar
+  `identidad`. **Los cuatro campos son obligatorios**: un `meserosAsignados`
+  opcional se olvida, y olvidarlo abre la comanda a todo el personal sin que
+  nadie se entere.
+- **El rechazo es un código tipificado**, no un booleano: `otro_local`,
+  `mesa_no_asignada`, `sesion_de_mesa_cerrada`, `fuera_de_la_mesa`,
+  `sesion_expirada`, `sesion_revocada`. PRD-001 §14 pide auditoría y AT-4
+  (regla 5) pide que el intento rechazado quede registrado con su motivo; un
+  motivo en prosa libre no se puede contar ni alertar.
+- **El acceso de la mesa no se revoca: se deja de conceder.** Al cerrarse la
+  sesión de mesa (F1-15), la regla deja de permitir porque el descriptor dice
+  que está cerrada. No hace falta recorrer los dispositivos revocando sesiones
+  —un recorrido que puede fallar a la mitad y dejar a uno con acceso—, y la
+  sesión del cliente sigue viva, que es lo correcto: sigue identificado, solo no
+  está sentado en ninguna parte.
+- **El personal no se mide contra la sesión de mesa.** Su acceso no viene de
+  estar sentado, y lo necesita después del cierre para las ventas y la auditoría
+  del turno (RF-A-06, RF-A-10). Lo que PRD-001 §16 manda expirar al cerrarse es
+  el acceso de quien entró por el QR.
+- **Una sesión se puede nombrar de dos maneras** dentro de una comanda: por su
+  dispositivo (se sentó sin cuenta, F1-13) y por su cuenta (se registró después,
+  F1-23). La regla acepta las dos, y no es laxitud: como `promoverACuenta`
+  conserva el identificador de la sesión, es el mismo dispositivo, y así el
+  acceso no depende de si la migración del participante ya ocurrió.
+- **Esta función no autoriza escrituras.** Pedir exige cuenta (RF-C-05 mod.),
+  cargar y corregir ítems son del mesero (RF-M-07, RF-M-08) y la comanda
+  `cobrando` rechaza toda escritura (AT-3). Son reglas de las tareas que agregan
+  esas escrituras; leer no es escribir.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Que `identidad` importe `comanda` y `mesa` y consulte lo que necesita | Invierte el grafo de AT-5: `comanda` y `mesa` importan `identidad`, así que esto cierra un ciclo. Y convierte la regla en una consulta, que es lo que hace que hoy se pueda probar sin base de datos. |
+| Poner la regla en `comanda`, que ya tiene los datos | Quedaría a un lado de la frontera y el mesero del panel de administración (RF-A-05) y el historial del cliente volverían a decidirla por su cuenta. La pregunta "quién puede ver esto" es de identidad en los tres casos. |
+| Decidir por rol solamente (`mesero` ⇒ ve las comandas) | Contradice RF-M-01 y PRD-001 §4.2 ("ve solo las mesas a su cargo"), y deja a cualquier comensal registrado viendo la comanda de la mesa de al lado, que es exactamente el riesgo que PRD-001 §16 lista para el QR. |
+| Un token de acceso a la mesa, con la mesa adentro | Es un permiso que no se puede quitar: "No es mi mesa" (RF-C-21) y el cierre de la sesión de mesa (F1-15) tendrían que esperar a que el token venza. La verdad de quién está sentado vive en la comanda, y ahí se consulta. |
+| Revocar las sesiones de los dispositivos al cerrar la mesa | Es un recorrido que puede fallar a la mitad, y de paso desloguea al cliente de su propia cuenta por haber terminado de comer. |
+| Devolver `true`/`false` | Pierde el motivo, y sin motivo no hay auditoría del rechazo (AT-4, regla 5) ni forma de distinguir un error de permisos de una sesión vencida en la app del cliente. |
+
+**Consecuencias.**
+
+- Quien lea una comanda tiene que **armar el descriptor**, y eso cuesta una
+  consulta de participantes y una de asignación. Es el precio de que la frontera
+  sea real; a cambio, la lista completa de hechos que gobiernan el acceso está en
+  un solo tipo en lugar de repartida en consultas.
+- **El historial del cliente (RF-C-13) y el comprobante posterior al pago no
+  pasan por acá.** Son lecturas de las cuentas pagadas de una persona, no acceso
+  a la comanda de una mesa abierta, y llegan en Fase 2 y 3 con su propia regla.
+  Si alguien afloja esta función para que entren, rompe PRD-001 §16.
+- Si mañana el local necesita que un mesero cubra una mesa ajena, se cambia
+  **quién llena `meserosAsignados`** (es `mesa` quien lo decide), no la regla.
+
+### 9.3 Identidad es el único módulo cuyas tablas no son por local
+
+AT-1 pide `local_id` obligatorio en **toda tabla de negocio**, con *row level
+security*. Las tablas de identidad son la excepción, y no por comodidad: lo
+decide PRD-001 §12, que al definir el usuario dice "rol (`cliente` | `mesero` |
+`admin`), **local al que pertenece (meseros y admin)**". Una cuenta de cliente es
+una persona —PRD-004 §3: una cuenta por número de teléfono— y una persona no
+pertenece a un local. Lo que es por local es todo lo que cuelga de ella: la
+visita, el nivel, el participante de comanda, la asignación de mesas.
+
+Por eso la sesión no lleva local: lo lleva el titular, y solo cuando es personal.
+La consecuencia práctica está en la regla de §9.2 —a un cliente no se le compara
+el local, lo que lo ata a uno es estar sentado en una comanda de ese local, que
+es un hecho más fuerte que un campo— y en el puerto: `porHuellaDeToken` es la
+única búsqueda de este módulo que **no** filtra por local, porque es la que
+*establece* de qué local es la petición. F1-02 hereda esta excepción y es la que
+tiene que escribirla en su *row level security*: `usuario.local_id` nulo para el
+cliente, obligatorio para el personal.
+
+### 9.4 Qué no se decide en F1-03
+
+- **El OTP (F1-20) y el registro (F1-21).** Queda declarada su frontera
+  (`ServicioIdentidad`, `ProveedorCodigo`, `LimitesOtp`) y una sola cosa fijada:
+  esos caminos terminan en una sesión abierta por AT-10. El proveedor de envío y
+  sus límites los deciden ellas, con el tercero contratado delante.
+- **El texto del consentimiento (F1-22, RF-C-26).** Lo bloquea G-4; acá solo
+  existe el campo de versión que lo va a referenciar.
+- **El PAGAYA ID** —código corto y QR personal de 60 s (RF-C-20, PRD-003 §3.1)—
+  es Fase 3 por el supuesto 1 del backlog. Nada de lo declarado acá puede abrir
+  una sesión a partir de un código corto: el código corto identifica y no
+  autentica.
+- **Cómo viaja el token en HTTP** (encabezado, cookie, vigencia del lado del
+  navegador) y el manejo de la sesión en los dos clientes. Lo decide quien decida
+  el marco web (F1-70) y el de la web app (F1-30), igual que §8.6.
+- **La tabla de sesiones, su `local_id` y su RLS**: F1-02, contra el puerto que
+  esta tarea deja escrito.
+- **Si una persona puede ser mesero y cliente a la vez.** PRD-001 §12 le da un
+  rol a cada usuario y PRD-004 §3 una cuenta a cada teléfono, así que hoy no
+  puede, y el modelo lo refleja tal cual en lugar de inventarle una salida: un
+  titular tiene un rol. Es un caso real —el personal también come— y si el piloto
+  lo encuentra, se cierra con un PRD, no con un campo.
+
+---
+
+## 10. El aislamiento por local (F1-02)
 
 Lo exige **F1-02** del [backlog](backlog-fase-1.md) ("Modelo multi-tenant
 aislado por local, con zona horaria del local", PRD-001 §13), de la que dependen
@@ -584,10 +806,10 @@ no puede depender de que nadie olvide un `WHERE`"*. Lo que falta es el **cómo**
 y son cuatro decisiones:
 
 ```
-AT-10 Aislamiento ── RLS forzada, un rol de aplicación y dos variables de sesión
-AT-11 Capa única ─── una transacción, un local; SQL a mano y nada de pool afuera
-AT-12 Configuración  un documento del local, no una columna por PRD
-AT-13 El día ─────── la fecha del local la calcula la base, no el proceso
+AT-12 Aislamiento ── RLS forzada, un rol de aplicación y dos variables de sesión
+AT-13 Capa única ─── una transacción, un local; SQL a mano y nada de pool afuera
+AT-14 Configuración  un documento del local, no una columna por PRD
+AT-15 El día ─────── la fecha del local la calcula la base, no el proceso
 ```
 
 El MVP opera con **un** local piloto (PRD-001 §13), así que nada de esto se va a
@@ -595,7 +817,18 @@ notar hasta que haya dos. Ése es exactamente el motivo de hacerlo ahora: una
 fuga entre locales no se descubre probando con uno, y el día que haya dos la
 tabla con el `local_id` que faltó ya tiene medio año de datos.
 
-### 9.1 AT-10 — `local_id`, RLS forzada y un rol que no es el que conecta
+**§9 llegó antes y eso cambia dos cosas, no una.** F1-03 entregó reglas puras y
+un puerto, sin tablas, justamente para no decidir este esquema desde otra tarea.
+Lo que sí decidió y esta sección recoge es la **excepción de identidad**
+(§9.3): sus tablas no llevan `local_id` obligatorio, así que no pasan por
+`activar_aislamiento` y tienen que dejar su fila en el registro de excepciones
+(§10.1). Y `sinLocal` deja de ser una entrada sin uso: es la que corre
+`porHuellaDeToken`, la búsqueda que *establece* de qué local es la petición y
+que por eso no puede filtrar por uno (§10.2). Lo que esta sección **no** entrega
+es la tabla de sesiones: la pide §9.4 y la escribe la migración que la cree,
+contra este mecanismo.
+
+### 10.1 AT-12 — `local_id`, RLS forzada y un rol que no es el que conecta
 
 **Qué lo exige.** PRD-001 §13 (multi-tenant desde el día uno; zona horaria por
 local), PRD-001 §14 (*"acceso a la comanda limitado a la mesa y al personal del
@@ -654,6 +887,27 @@ Dos piezas más, que son las que hacen que esto sobreviva a la tarea 40:
   `pagaya.tabla_sin_local`, con su motivo: pedir una excepción es escribirla y
   que alguien la revise.
 
+**La primera excepción prevista ya tiene nombre: las tablas de identidad.**
+**§9.3** lo decidió antes que esta tarea y con un argumento de producto, no de
+comodidad: PRD-001 §12 da el "local al que pertenece" solo a meseros y
+administradores, y PRD-004 §3 hace de una cuenta de cliente una persona —una por
+número de teléfono—, que no pertenece a ningún local. Por local es lo que cuelga
+de ella: la visita, el nivel, el participante de comanda, la asignación de
+mesas.
+
+La consecuencia concreta para este mecanismo es que **`activar_aislamiento` no
+les sirve**: exige `local_id uuid NOT NULL`, y §9.3 pide `usuario.local_id`
+**nulo para el cliente y obligatorio para el personal**. La migración que cree
+esas tablas tiene entonces dos obligaciones, y ninguna es opcional: escribir su
+política a mano —personal, el de su local; cliente, sin comparación de local,
+porque lo que lo ata a uno es estar sentado en una comanda de ese local, que es
+un hecho más fuerte que un campo (§9.2)— y **dejar su fila en
+`pagaya.tabla_sin_local` con ese motivo**, para que la guardia siga en verde por
+una decisión escrita y no por un descuido. El `porHuellaDeToken` de §9.3 es la
+única búsqueda del sistema que legítimamente no filtra por local, porque es la
+que *establece* de qué local es la petición: corre, por eso, antes de que haya
+un local que fijar, y le toca `sinLocal` (§10.2).
+
 **Lo que esto no es.** No es una frontera de privilegio contra nuestro propio
 código: quien puede abrir una transacción puede encender `entre_locales`. Lo que
 compra la row level security acá es que **el caso por defecto sea cero filas** y
@@ -683,7 +937,7 @@ ninguna parte: queda nombrada acá y se toma cuando exista producción (S-6).
   índice solo de `local_id` no sirve de nada cuando hay un local, y el índice
   compuesto que sí sirve lo sabe la tarea que crea la tabla.
 
-### 9.2 AT-11 — La capa única: una transacción, un local
+### 10.2 AT-13 — La capa única: una transacción, un local
 
 **Qué lo exige.** La misma frase de AT-1 ("una única capa de acceso"), y §8.6,
 que dejó explícitamente a F1-02 la decisión de cómo se consulta.
@@ -695,7 +949,7 @@ transacción sin decir desde dónde se mira:
 | Entrada | Qué hace | Para qué |
 |---|---|---|
 | `conLocal(local, …)` | Fija `pagaya.local_id` y cambia a `pagaya_app` | El camino normal: toda petición de un cliente, un mesero o un administrador |
-| `sinLocal(…)` | Solo cambia de rol | Lo que no toca datos de negocio. Si los toca, ve cero filas, y eso es correcto |
+| `sinLocal(…)` | Solo cambia de rol | Lo que ocurre **antes** de saber de qué local es la petición: autenticar un token (`porHuellaDeToken`, §9.3). Sobre una tabla aislada ve cero filas, y eso es correcto, no un error que haya que rodear |
 | `entreLocales(motivo, …)` | Enciende `pagaya.entre_locales` | Alta de un local y carga inicial (F1-05). Exige un motivo escrito |
 
 Lo demás de la decisión:
@@ -736,7 +990,7 @@ Lo demás de la decisión:
 - Una petición que necesite dos locales no existe en el MVP. Si apareciera, es
   `entreLocales` con su motivo, y el motivo se lee en la revisión.
 
-### 9.3 AT-12 — La configuración del local es un documento, no una columna por PRD
+### 10.3 AT-14 — La configuración del local es un documento, no una columna por PRD
 
 **Qué lo exige.** PRD-001 §12 (el Local guarda "datos, impuestos, medios de
 pago, configuración de niveles") y cada PRD desde entonces: PRD-002 §6 agrega
@@ -771,7 +1025,7 @@ clave tiene que agregar su validación y su valor por defecto. Es el precio
 aceptado, y es aceptable **solo** mientras se respete la regla de que nada con
 una invariante detrás viva ahí.
 
-### 9.4 AT-13 — La fecha del local la calcula la base
+### 10.4 AT-15 — La fecha del local la calcula la base
 
 **Qué lo exige.** PRD-001 §13: *"zona horaria y turnos por local, porque 'visita
 del día' y 'ventas del día' dependen de eso"*. PRD-001 §8: *"máximo **una visita
@@ -797,7 +1051,7 @@ el cierre de caja de un sábado queda partido en dos días.
 | Dejarlo para cuando haya reportes (Fase 4) | La visita y el tope diario de descuento son de Fase 3 y de PRD-006, no de Fase 4, y los dos ya preguntan "¿qué día es en el local?". |
 
 **Consecuencias.** Queda un supuesto que ningún PRD responde y que se registra
-como **S-9**: el día operativo es el **día calendario** del local. Un restaurante
+como **S-11**: el día operativo es el **día calendario** del local. Un restaurante
 que cierra a las 02:00 tiene dos "días operativos" en una misma noche, y la
 visita de quien pagó a las 01:30 cae al día siguiente. Nada en los PRDs dice lo
 contrario, así que se construye así; cambiarlo es agregar un corte configurable

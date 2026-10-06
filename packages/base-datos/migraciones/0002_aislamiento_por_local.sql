@@ -11,7 +11,7 @@
 --
 -- Esta migración no crea ninguna tabla de mesa, comanda ni pago: ésas son
 -- F1-10, F1-40 y la Fase 2. Lo que crea es el inquilino y el mecanismo que
--- todas ellas van a usar. Ver docs/arquitectura.md §9 (AT-10 a AT-13).
+-- todas ellas van a usar. Ver docs/arquitectura.md §10 (AT-12 a AT-15).
 --
 -- La forma del mecanismo, en tres piezas:
 --
@@ -45,7 +45,7 @@
 -- security acá es que **el caso por defecto sea cero filas** y que cruzar de
 -- local haya que escribirlo. La frontera de privilegio de verdad necesita una
 -- segunda credencial; está nombrada como decisión diferida en
--- docs/arquitectura.md §9 (AT-11, consecuencias).
+-- docs/arquitectura.md §10 (AT-13, consecuencias).
 
 -- ---------------------------------------------------------------------------
 -- El rol. Es un objeto del clúster, no de la base: por eso la creación es
@@ -70,7 +70,7 @@ GRANT USAGE ON SCHEMA pagaya TO pagaya_app;
 -- El rol que conecta tiene que poder hacer `SET LOCAL ROLE pagaya_app`. En dev
 -- y en integración continua migra y sirve el mismo rol; cuando se separen, esto
 -- es un GRANT en el alta de la base y no una migración nueva
--- (docs/arquitectura.md, supuesto S-10).
+-- (docs/arquitectura.md, supuesto S-12).
 DO $$
 BEGIN
   EXECUTE format('GRANT pagaya_app TO %I', current_user);
@@ -134,7 +134,7 @@ COMMENT ON FUNCTION pagaya.zona_horaria_valida(text) IS
 -- como columnas muertas que nadie llena en la Fase 1.
 --
 -- `configuracion` es un documento y no una columna por campo a propósito
--- (AT-12): entre PRD-002 y PRD-007 la configuración del local cambió de forma
+-- (AT-14): entre PRD-002 y PRD-007 la configuración del local cambió de forma
 -- cuatro veces, y nada de lo que guarda sostiene una invariante. Lo que sí
 -- sostiene una invariante —dinero, identidad, aislamiento— es columna con su
 -- restricción, nunca una clave de este documento.
@@ -210,7 +210,7 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION pagaya.fecha_local(uuid, timestamptz) IS
-  'El día calendario del local para un instante dado. Supuesto S-9: el día operativo es el día calendario del local; un local que cierra después de medianoche necesitaría un corte configurable, y eso es un PRD.';
+  'El día calendario del local para un instante dado. Supuesto S-11: el día operativo es el día calendario del local; un local que cierra después de medianoche necesitaría un corte configurable, y eso es un PRD.';
 
 GRANT EXECUTE ON FUNCTION pagaya.fecha_local(uuid, timestamptz) TO pagaya_app;
 
@@ -273,6 +273,26 @@ COMMENT ON FUNCTION pagaya.activar_aislamiento(regclass) IS
 -- ---------------------------------------------------------------------------
 -- Las excepciones, escritas. Una tabla sin local_id tiene que ser una decisión
 -- que alguien tomó y firmó, no un descuido que nadie vio.
+--
+-- Las tres filas de abajo son las de esta migración y son todas de
+-- infraestructura. **La primera excepción de negocio ya tiene nombre y ya está
+-- decidida: las tablas de identidad**, por docs/arquitectura.md §9.3 (F1-03),
+-- con un argumento de producto y no de comodidad: PRD-001 §12 le da el "local
+-- al que pertenece" solo a meseros y administradores, y PRD-004 §3 hace de una
+-- cuenta de cliente una persona —una por número de teléfono—, que no pertenece
+-- a ningún local. Por local es lo que cuelga de ella: la visita, el nivel, el
+-- participante de comanda, la asignación de mesas.
+--
+-- Para el mecanismo de esta migración eso significa algo muy concreto:
+-- `activar_aislamiento` **no le sirve** a esas tablas, porque exige
+-- `local_id uuid NOT NULL` y §9.3 pide `usuario.local_id` nulo para el cliente
+-- y obligatorio para el personal. La migración que las cree tiene entonces dos
+-- obligaciones: escribir su política a mano —el personal ve lo de su local; al
+-- cliente no se le compara el local, porque lo que lo ata a uno es estar
+-- sentado en una comanda de ese local (§9.2)— y dejar su fila acá con ese
+-- motivo. Si no deja la fila, `tablas_sin_aislamiento()` la reporta y
+-- `make verify` falla, que es exactamente lo que tiene que pasar: la excepción
+-- es legítima, saltársela en silencio no.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE pagaya.tabla_sin_local (
@@ -281,7 +301,7 @@ CREATE TABLE pagaya.tabla_sin_local (
 );
 
 COMMENT ON TABLE pagaya.tabla_sin_local IS
-  'Tablas del esquema pagaya que a propósito no llevan local_id, con el motivo. Agregar una fila acá es la forma de pedir la excepción, y se revisa como cualquier otro cambio.';
+  'Tablas del esquema pagaya que a propósito no llevan local_id, con el motivo. Agregar una fila acá es la forma de pedir la excepción, y se revisa como cualquier otro cambio. La primera excepción de negocio prevista son las tablas de identidad, ya decidida en docs/arquitectura.md §9.3: una cuenta de cliente es una persona y una persona no pertenece a un local.';
 
 INSERT INTO pagaya.tabla_sin_local (tabla, motivo) VALUES
   ('migracion',

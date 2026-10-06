@@ -55,7 +55,7 @@
         "@pagaya/nucleo",
         "@pagaya/config"
       ],
-      "porque": "La capa única de acceso (AT-11) y las migraciones (AT-7). El pool no sale de acá: fuera de este paquete no hay forma de consultar sin decir desde qué local se mira."
+      "porque": "La capa única de acceso (AT-13) y las migraciones (AT-7). El pool no sale de acá: fuera de este paquete no hay forma de consultar sin decir desde qué local se mira."
     },
     "@pagaya/auditoria": {
       "ruta": "packages/auditoria",

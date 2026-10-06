@@ -42,7 +42,7 @@ PAGAYA_AMBIENTE=dev make migrar
 
 `PAGAYA_BD_URL` tiene que apuntar a un rol **que no sea superusuario**. Un
 superusuario esquiva la *row level security* entera, y con ella el aislamiento
-entre locales que la migración 0002 escribe (arquitectura.md AT-10): todo
+entre locales que la migración 0002 escribe (arquitectura.md AT-12): todo
 seguiría funcionando y un local vería los datos de otro. Una prueba de
 `make verify` lo exige en voz alta en vez de dejarlo a la suerte del alta.
 

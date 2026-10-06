@@ -39,7 +39,7 @@ jobs:
       # Credenciales de una base de datos efímera que vive y muere con este job.
       # El rol `pagaya` lo crea el paso de abajo y NO es superusuario: un
       # superusuario esquiva la row level security y el aislamiento entre
-      # locales dejaría de estar verificado (arquitectura.md AT-10).
+      # locales dejaría de estar verificado (arquitectura.md AT-12).
       PAGAYA_BD_URL: postgres://pagaya:pagaya@localhost:5432/pagaya_ci
       PAGAYA_FIRMA_SESION: solo-para-integracion-continua
       # Sin esto, una base de datos mal configurada haría que las pruebas de
