@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Pool de PostgreSQL y migraciones. Es la capa única de acceso que AT-1 exige para filtrar local_id.",
+  "description": "La capa única de acceso que AT-1 exige: una transacción, un local. Y las migraciones, donde vive la row level security.",
   "exports": {
     ".": "./src/index.ts"
   },

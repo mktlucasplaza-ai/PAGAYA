@@ -38,6 +38,26 @@ cp .env.ejemplo .env     # .env está en .gitignore
 PAGAYA_AMBIENTE=dev make migrar
 ```
 
+## Una condición del alta de la base: sin superusuario
+
+`PAGAYA_BD_URL` tiene que apuntar a un rol **que no sea superusuario**. Un
+superusuario esquiva la *row level security* entera, y con ella el aislamiento
+entre locales que la migración 0002 escribe (arquitectura.md AT-10): todo
+seguiría funcionando y un local vería los datos de otro. Una prueba de
+`make verify` lo exige en voz alta en vez de dejarlo a la suerte del alta.
+
+El alta mínima, igual en una máquina y en integración continua:
+
+```sql
+CREATE ROLE pagaya LOGIN CREATEROLE PASSWORD '…';   -- sin SUPERUSER
+CREATE DATABASE pagaya_dev OWNER pagaya;
+```
+
+`CREATEROLE` es lo único que hace falta de más, y es para que la migración 0002
+pueda crear `pagaya_app`, el rol al que la capa de acceso cambia en cada
+transacción. Si la base la provee un tercero que no entrega `CREATEROLE`, el rol
+se crea una vez en el alta y la migración lo encuentra hecho.
+
 ## Qué agregar acá y qué no
 
 Va acá lo que **cambia entre un ambiente y otro y no cambia durante la

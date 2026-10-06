@@ -55,7 +55,7 @@
         "@pagaya/nucleo",
         "@pagaya/config"
       ],
-      "porque": "Pool de PostgreSQL y migraciones. Es la capa única de acceso que AT-1 exige para filtrar local_id."
+      "porque": "La capa única de acceso (AT-11) y las migraciones (AT-7). El pool no sale de acá: fuera de este paquete no hay forma de consultar sin decir desde qué local se mira."
     },
     "@pagaya/auditoria": {
       "ruta": "packages/auditoria",

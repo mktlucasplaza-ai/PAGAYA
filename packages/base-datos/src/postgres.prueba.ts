@@ -58,15 +58,19 @@ describe("postgres", { skip: hayBaseDatos ? false : "sin PAGAYA_BD_URL" }, () =>
     assert.deepEqual(informe.aplicadas, []);
   });
 
-  test("el esquema pagaya existe y la fundación no dejó tablas de negocio", async () => {
+  test("el esquema pagaya tiene las tablas que las migraciones crearon", async () => {
     const { rows } = await cliente.query<{ nombre: string }>(
       `SELECT table_name AS nombre FROM information_schema.tables WHERE table_schema = 'pagaya'`,
     );
-    assert.deepEqual(
-      rows.map((f) => f.nombre).sort(),
-      ["migracion"],
-      "F1-01 no trae modelo de datos: las tablas de negocio llegan con F1-02",
-    );
+    const tablas = new Set(rows.map((f) => f.nombre));
+    // No se compara la lista completa: acceso.prueba.ts corre en otro proceso
+    // contra la misma base y monta y desmonta tablas de ensayo. Lo que se
+    // afirma acá es que cada migración dejó lo suyo; que ninguna tabla de
+    // negocio se escape del aislamiento lo prueba acceso.prueba.ts con
+    // `pagaya.tablas_sin_aislamiento()`.
+    for (const esperada of ["migracion", "local", "tabla_sin_local"]) {
+      assert.ok(tablas.has(esperada), `falta la tabla pagaya.${esperada}`);
+    }
   });
 });
 

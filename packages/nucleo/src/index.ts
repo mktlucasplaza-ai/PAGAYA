@@ -14,6 +14,7 @@
  * motivo, y un motivo en prosa libre no se puede contar ni alertar.
  */
 export type CodigoError =
+  | "acceso_invalido"
   | "configuracion_invalida"
   | "migracion_invalida"
   | "no_implementado";
