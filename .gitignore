@@ -11,3 +11,12 @@ dist/
 
 # Sistema operativo y editores
 .DS_Store
+
+# Las corridas de evals/ dejan transcripts, diffs y expedientes pesados; se
+# versiona solo el .json de resumen de cada corrida.
+evals/resultados/*
+!evals/resultados/*.json
+
+# Caché de Python (evals/run.py)
+__pycache__/
+*.pyc
