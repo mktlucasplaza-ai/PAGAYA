@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { inspect } from "node:util";
 import { describe, test } from "node:test";
 
-import { ErrorPagaya, Secreto, relojFijo } from "./index.ts";
+import { ErrorPagaya, Secreto, aleatorioDelSistema, aleatorioFijo, relojFijo } from "./index.ts";
 
 describe("secreto", () => {
   const secreto = new Secreto("PAGAYA_BD_URL", "postgres://usuario:clave@maquina/base");
@@ -43,5 +43,23 @@ describe("reloj", () => {
     const primera = reloj.ahora();
     primera.setFullYear(1999);
     assert.equal(reloj.ahora().toISOString(), "2026-10-04T21:30:00.000Z");
+  });
+});
+
+describe("fuente aleatoria", () => {
+  test("entrega la cantidad de bytes pedida", () => {
+    for (const fuente of [aleatorioDelSistema, aleatorioFijo()]) {
+      assert.equal(fuente.bytes(32).length, 32);
+      assert.equal(fuente.bytes(0).length, 0);
+    }
+  });
+
+  test("la fuente fija es determinista y no repite el bloque anterior", () => {
+    const primera = aleatorioFijo(4);
+    const segunda = aleatorioFijo(4);
+    const unoA = primera.bytes(8);
+    const dosA = primera.bytes(8);
+    assert.deepEqual([...unoA], [...segunda.bytes(8)]);
+    assert.notDeepEqual([...unoA], [...dosA]);
   });
 });
