@@ -1,0 +1,241 @@
+{
+  "formato": 1,
+  "local": {
+    "slug": "demo-nunoa",
+    "nombre": "Cocinería Demo",
+    "zona_horaria": "America/Santiago",
+    "moneda": "CLP"
+  },
+  "carta": {
+    "categorias": [
+      { "slug": "entradas", "nombre": "Entradas", "orden": 1 },
+      { "slug": "fondos", "nombre": "Platos de fondo", "orden": 2 },
+      { "slug": "postres", "nombre": "Postres", "orden": 3 },
+      { "slug": "bebestibles", "nombre": "Bebestibles", "orden": 4 },
+      { "slug": "cocteleria", "nombre": "Coctelería", "orden": 5 }
+    ],
+    "productos": [
+      {
+        "sku": "empanada-queso",
+        "categoria": "entradas",
+        "nombre": "Empanada de queso",
+        "descripcion": "Frita, de queso mantecoso.",
+        "precio": 4500,
+        "disponible": true,
+        "foto": "fotos/empanada-queso.webp",
+        "orden": 1,
+        "variantes": []
+      },
+      {
+        "sku": "ceviche",
+        "categoria": "entradas",
+        "nombre": "Ceviche del día",
+        "descripcion": "Pescado blanco, cilantro y cebolla morada.",
+        "precio": 9900,
+        "disponible": true,
+        "foto": null,
+        "orden": 2,
+        "variantes": [
+          { "slug": "individual", "nombre": "Individual", "precio_delta": 0 },
+          { "slug": "para-compartir", "nombre": "Para compartir", "precio_delta": 4600 }
+        ]
+      },
+      {
+        "sku": "papas-bravas",
+        "categoria": "entradas",
+        "nombre": "Papas bravas",
+        "descripcion": "Con salsa de la casa, picante medio.",
+        "precio": 6500,
+        "disponible": true,
+        "foto": null,
+        "orden": 3,
+        "variantes": []
+      },
+      {
+        "sku": "lomo-a-lo-pobre",
+        "categoria": "fondos",
+        "nombre": "Lomo a lo pobre",
+        "descripcion": "Lomo liso, papas fritas, cebolla y dos huevos.",
+        "precio": 14900,
+        "disponible": true,
+        "foto": "fotos/lomo-a-lo-pobre.webp",
+        "orden": 1,
+        "variantes": [
+          { "slug": "normal", "nombre": "Normal", "precio_delta": 0 },
+          { "slug": "sin-huevo", "nombre": "Sin huevo", "precio_delta": -900 }
+        ]
+      },
+      {
+        "sku": "pescado-del-dia",
+        "categoria": "fondos",
+        "nombre": "Pescado del día",
+        "descripcion": "Con ensalada chilena o puré, a elección.",
+        "precio": 13900,
+        "disponible": true,
+        "foto": null,
+        "orden": 2,
+        "variantes": [
+          { "slug": "a-la-plancha", "nombre": "A la plancha", "precio_delta": 0 },
+          { "slug": "frito", "nombre": "Frito", "precio_delta": 0 }
+        ]
+      },
+      {
+        "sku": "chorrillana",
+        "categoria": "fondos",
+        "nombre": "Chorrillana para dos",
+        "descripcion": "Papas fritas, carne, cebolla y huevo.",
+        "precio": 16900,
+        "disponible": true,
+        "foto": null,
+        "orden": 3,
+        "variantes": []
+      },
+      {
+        "sku": "risotto-vegetariano",
+        "categoria": "fondos",
+        "nombre": "Risotto de zapallo",
+        "descripcion": "Vegetariano, con queso de cabra.",
+        "precio": 11900,
+        "disponible": true,
+        "foto": null,
+        "orden": 4,
+        "variantes": []
+      },
+      {
+        "sku": "leche-asada",
+        "categoria": "postres",
+        "nombre": "Leche asada",
+        "descripcion": "De la abuela, con caramelo.",
+        "precio": 4900,
+        "disponible": true,
+        "foto": null,
+        "orden": 1,
+        "variantes": []
+      },
+      {
+        "sku": "mote-con-huesillo",
+        "categoria": "postres",
+        "nombre": "Mote con huesillo",
+        "descripcion": "Bien frío, de temporada.",
+        "precio": 3900,
+        "disponible": false,
+        "foto": null,
+        "orden": 2,
+        "variantes": []
+      },
+      {
+        "sku": "bebida-lata",
+        "categoria": "bebestibles",
+        "nombre": "Bebida en lata",
+        "descripcion": "350 cc.",
+        "precio": 2200,
+        "disponible": true,
+        "foto": null,
+        "orden": 1,
+        "variantes": [
+          { "slug": "normal", "nombre": "Normal", "precio_delta": 0 },
+          { "slug": "sin-azucar", "nombre": "Sin azúcar", "precio_delta": 0 }
+        ]
+      },
+      {
+        "sku": "agua-mineral",
+        "categoria": "bebestibles",
+        "nombre": "Agua mineral",
+        "descripcion": "500 cc.",
+        "precio": 2000,
+        "disponible": true,
+        "foto": null,
+        "orden": 2,
+        "variantes": [
+          { "slug": "con-gas", "nombre": "Con gas", "precio_delta": 0 },
+          { "slug": "sin-gas", "nombre": "Sin gas", "precio_delta": 0 }
+        ]
+      },
+      {
+        "sku": "jugo-natural",
+        "categoria": "bebestibles",
+        "nombre": "Jugo natural",
+        "descripcion": "De fruta de la estación.",
+        "precio": 3200,
+        "disponible": true,
+        "foto": null,
+        "orden": 3,
+        "variantes": []
+      },
+      {
+        "sku": "pisco-sour",
+        "categoria": "cocteleria",
+        "nombre": "Pisco sour",
+        "descripcion": "Pisco 35°, limón de Pica.",
+        "precio": 6900,
+        "disponible": true,
+        "foto": "fotos/pisco-sour.webp",
+        "orden": 1,
+        "variantes": [
+          { "slug": "clasico", "nombre": "Clásico", "precio_delta": 0 },
+          { "slug": "mango", "nombre": "De mango", "precio_delta": 800 }
+        ]
+      },
+      {
+        "sku": "piscola",
+        "categoria": "cocteleria",
+        "nombre": "Piscola",
+        "descripcion": "Pisco 35° y bebida de cola.",
+        "precio": 6500,
+        "disponible": true,
+        "foto": null,
+        "orden": 2,
+        "variantes": []
+      },
+      {
+        "sku": "cerveza-artesanal",
+        "categoria": "cocteleria",
+        "nombre": "Cerveza artesanal",
+        "descripcion": "Rotativa, pregunta por la del día.",
+        "precio": 5900,
+        "disponible": true,
+        "foto": null,
+        "orden": 3,
+        "variantes": [
+          { "slug": "330", "nombre": "330 cc", "precio_delta": 0 },
+          { "slug": "473", "nombre": "473 cc", "precio_delta": 1200 }
+        ]
+      }
+    ]
+  },
+  "zonas": [
+    { "slug": "salon", "nombre": "Salón" },
+    { "slug": "terraza", "nombre": "Terraza" },
+    { "slug": "barra", "nombre": "Barra" }
+  ],
+  "mesas": [
+    { "numero": "1", "zona": "salon", "capacidad": 4 },
+    { "numero": "2", "zona": "salon", "capacidad": 4 },
+    { "numero": "3", "zona": "salon", "capacidad": 2 },
+    { "numero": "4", "zona": "salon", "capacidad": 6 },
+    { "numero": "5", "zona": "salon", "capacidad": 4 },
+    { "numero": "6", "zona": "salon", "capacidad": 8 },
+    { "numero": "T1", "zona": "terraza", "capacidad": 4 },
+    { "numero": "T2", "zona": "terraza", "capacidad": 4 },
+    { "numero": "T3", "zona": "terraza", "capacidad": 2 },
+    { "numero": "B1", "zona": "barra", "capacidad": 2 },
+    { "numero": "B2", "zona": "barra", "capacidad": 2 },
+    { "numero": "B3", "zona": "barra", "capacidad": 2 }
+  ],
+  "meseros": [
+    { "codigo": "m-01", "nombre_pila": "Ana", "telefono": "+56900000001" },
+    { "codigo": "m-02", "nombre_pila": "Bastián", "telefono": "+56900000002" },
+    { "codigo": "m-03", "nombre_pila": "Carla", "telefono": "+56900000003" }
+  ],
+  "turnos": [
+    { "slug": "almuerzo", "nombre": "Almuerzo", "inicio": "12:00", "fin": "16:00" },
+    { "slug": "cena", "nombre": "Cena", "inicio": "19:00", "fin": "01:00" }
+  ],
+  "asignaciones": [
+    { "turno": "almuerzo", "mesero": "m-01", "mesas": ["1", "2", "3", "4", "5", "6"] },
+    { "turno": "almuerzo", "mesero": "m-02", "mesas": ["T1", "T2", "T3", "B1", "B2", "B3"] },
+    { "turno": "cena", "mesero": "m-01", "mesas": ["1", "2", "3", "T1"] },
+    { "turno": "cena", "mesero": "m-02", "mesas": ["4", "5", "6", "T2"] },
+    { "turno": "cena", "mesero": "m-03", "mesas": ["T3", "B1", "B2", "B3"] }
+  ]
+}
