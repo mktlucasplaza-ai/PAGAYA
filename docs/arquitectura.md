@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 |
+| **Fecha** | 2026-10-04 (§9, la identidad, y §10, el aislamiento por local, agregadas el 2026-10-06) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -35,7 +35,10 @@ Debajo de las cuatro está la **fundación del repositorio** (§8): el monorepo 
 convierte la frontera de AT-1 en un dato verificable, las migraciones donde se
 escriben las invariantes de AT-2, AT-3 y AT-4, los ambientes y la puerta de
 verificación. No es una quinta decisión del mismo tipo: es dónde viven las otras
-cuatro.
+cuatro. Y **debajo de todo** está el aislamiento por local (§10): la mitad de
+AT-1 que ninguna de las otras tres puede suponer resuelta, porque una invariante
+de dinero que se cumple sobre las filas del local equivocado no es una
+invariante.
 
 El hilo común: **las reglas que involucran dinero o identidad no viven en la
 interfaz**. Viven en una transacción de base de datos, porque es el único lugar
@@ -45,6 +48,11 @@ Y **sobre** las cuatro está la identidad (§9): AT-10 y AT-11 no agregan una re
 de dinero, deciden quién llega hasta una. Van después porque AT-11 solo es
 posible con la frontera de AT-5 ya verificada — es la que la obliga a decidir
 sobre la comanda sin importarla.
+
+Las dos últimas se tocan en un punto y está escrito en los dos lados: §9.3 deja
+a las tablas de identidad **fuera** del `local_id` obligatorio —una persona no
+pertenece a un local— y §10.1 es donde esa excepción se escribe, en el registro
+que la migración 0002 crea para que pedir una excepción sea un acto visible.
 
 ---
 
@@ -318,11 +326,12 @@ llegue el webhook.
 
 ## 6. Supuestos y preguntas abiertas
 
-Lo que aquí se decidió sin que lo decidiera un PRD. **S-1 era la única pregunta
-de producto y ya la cerró el PRD-006**; se conserva la fila como registro. Casi
-todas las demás son valores por defecto técnicos que viven en configuración; la
-excepción es **S-9**, que no es un número sino la lectura de dos requisitos que
-dicen cosas distintas, y por eso dice qué la reabriría como PRD.
+Lo que aquí se decidió sin que lo decidiera un PRD. **S-1 era una pregunta de
+producto y ya la cerró el PRD-006**; se conserva la fila como registro. Casi
+todas las demás son valores por defecto técnicos que viven en configuración;
+las excepciones son dos y están marcadas: **S-9**, que no es un número sino la
+lectura de dos requisitos que dicen cosas distintas, y **S-11**, que toca qué
+cuenta como visita. Las dos dicen qué las reabriría como PRD.
 
 | ID | Supuesto | Por qué, y qué pasa si se resuelve distinto |
 |---|---|---|
@@ -336,6 +345,8 @@ dicen cosas distintas, y por eso dice qué la reabriría como PRD.
 | S-8 | **Node 22.18 o superior** como plataforma, y TypeScript ejecutado sin compilar (§8.2). | Ningún PRD fija el entorno de ejecución. Si un proveedor de despliegue obliga a una versión anterior, vuelve un paso de transpilación: cambia el `Makefile` y el despliegue, no el código. |
 | S-9 | El **mesero ve la comanda solo de las mesas que tiene asignadas** en el turno; el administrador, de todas las del local (§9.2). | PRD-001 §14 dice "el personal del local" sin distinguir, y RF-M-01 con PRD-001 §4.2 dicen "solo las mesas a su cargo". Se adopta la lectura más estricta de las dos, que además es la que hace falta para que el escalamiento al administrador de PRD-001 §9 tenga sentido: una mesa sin asignación no la ve ningún mesero, y por eso se escala (F1-73). Si la operación real necesita que un mesero cubra una mesa ajena, cambia **quién llena `meserosAsignados`** —y eso lo decide `mesa`, con RF-A-04 reasignando en caliente—, no la regla. Si tuviera que cambiar la regla, sería un PRD. El caso concreto que esto deja sobre la mesa de **F1-14**: un mesero abre una mesa de otra zona (RF-M-17) y con esta regla no vería la comanda que acaba de crear. Lo resuelve esa tarea decidiendo si abrir una mesa implica quedar asignado a ella; acá solo se declara que el acceso se lee de la asignación y de ningún otro lado. |
 | S-10 | Vigencia de sesión: **cliente 180 días deslizantes**, **mesero 16 h** y **admin 12 h** no deslizantes, **sin cuenta 12 h** deslizantes (§9.1). | PRD-001 §14 exige "sesiones por rol" y PRD-004 §3 exige que la del cliente sea persistente, pero ningún PRD fija los números. La forma —deslizante para el cliente, de una jornada para el personal— es la decisión; los plazos son configuración y se calibran con la operación. Muy corto en el cliente, se gasta OTP de más, que es el costo variable que PRD-004 §3 quiere bajar; muy largo en el personal, un teléfono olvidado en la barra queda con sesión abierta. |
+| S-11 | **El día operativo del local es su día calendario** en su zona horaria (§10.4). | Ningún PRD lo dice y tres reglas dependen de ello: "una visita por día por local" (PRD-001 §8), "ventas del día" (RF-A-06) y "un descuento por cliente por día por local" (PRD-006 §2, regla 7). Un restaurante que cierra a las 02:00 parte la noche en dos días, y la visita de quien pagó a las 01:30 cae al día siguiente. Si eso importa en el piloto, el arreglo es un corte configurable por local y **es un PRD**, no un parche: cambia qué cuenta como visita. |
+| S-12 | **El mismo rol conecta y migra**, y no es superusuario (§10.1). | Ningún PRD habla de roles de base de datos. Lo que sí es innegociable es que el rol que conecta no sea superusuario: un superusuario esquiva la row level security y el aislamiento entre locales deja de existir en silencio. Separar el rol que migra del que sirve es mejor y es un `GRANT` en el alta de la base, no una migración: la migración 0002 le concede `pagaya_app` a quien la corre. |
 
 ---
 
@@ -569,7 +580,7 @@ base de datos, y el verde de la CI no se puede obtener sin ella.
   ahí se juega la primera pantalla de la primera visita.
 - **Capa de consultas** (SQL a mano, constructor de consultas o ORM solo para
   leer). Lo decide F1-02, que es la que escribe la capa única de acceso con
-  `local_id` que AT-1 exige.
+  `local_id` que AT-1 exige. **Ya decidido:** §10, AT-13.
 - **Nube, despliegue y observabilidad.** §7 ya los deja fuera; F1-01 solo deja
   dos procesos que arrancan con su configuración y se apagan limpio.
 
@@ -781,3 +792,267 @@ cliente, obligatorio para el personal.
   puede, y el modelo lo refleja tal cual en lugar de inventarle una salida: un
   titular tiene un rol. Es un caso real —el personal también come— y si el piloto
   lo encuentra, se cierra con un PRD, no con un campo.
+
+---
+
+## 10. El aislamiento por local (F1-02)
+
+Lo exige **F1-02** del [backlog](backlog-fase-1.md) ("Modelo multi-tenant
+aislado por local, con zona horaria del local", PRD-001 §13), de la que dependen
+todas las tareas que escriben datos. AT-1 ya decidió el **qué** en una frase:
+*"columna `local_id` obligatoria en toda tabla de negocio, filtrada en una única
+capa de acceso y respaldada por row level security de PostgreSQL. El aislamiento
+no puede depender de que nadie olvide un `WHERE`"*. Lo que falta es el **cómo**,
+y son cuatro decisiones:
+
+```
+AT-12 Aislamiento ── RLS forzada, un rol de aplicación y dos variables de sesión
+AT-13 Capa única ─── una transacción, un local; SQL a mano y nada de pool afuera
+AT-14 Configuración  un documento del local, no una columna por PRD
+AT-15 El día ─────── la fecha del local la calcula la base, no el proceso
+```
+
+El MVP opera con **un** local piloto (PRD-001 §13), así que nada de esto se va a
+notar hasta que haya dos. Ése es exactamente el motivo de hacerlo ahora: una
+fuga entre locales no se descubre probando con uno, y el día que haya dos la
+tabla con el `local_id` que faltó ya tiene medio año de datos.
+
+**§9 llegó antes y eso cambia dos cosas, no una.** F1-03 entregó reglas puras y
+un puerto, sin tablas, justamente para no decidir este esquema desde otra tarea.
+Lo que sí decidió y esta sección recoge es la **excepción de identidad**
+(§9.3): sus tablas no llevan `local_id` obligatorio, así que no pasan por
+`activar_aislamiento` y tienen que dejar su fila en el registro de excepciones
+(§10.1). Y `sinLocal` deja de ser una entrada sin uso: es la que corre
+`porHuellaDeToken`, la búsqueda que *establece* de qué local es la petición y
+que por eso no puede filtrar por uno (§10.2). Lo que esta sección **no** entrega
+es la tabla de sesiones: la pide §9.4 y la escribe la migración que la cree,
+contra este mecanismo.
+
+### 10.1 AT-12 — `local_id`, RLS forzada y un rol que no es el que conecta
+
+**Qué lo exige.** PRD-001 §13 (multi-tenant desde el día uno; zona horaria por
+local), PRD-001 §14 (*"acceso a la comanda limitado a la mesa y al personal del
+local"*) y AT-1. Lo escribe la migración
+`0002_aislamiento_por_local.sql`, inmutable como todas (AT-7).
+
+**Decisión.** Tres piezas y dos condiciones del alta de la base.
+
+Las piezas:
+
+- **`pagaya_app`**, un rol sin login al que la capa de acceso cambia con
+  `SET LOCAL ROLE` al abrir cada transacción. Es el único rol con permisos sobre
+  las tablas de negocio, y no tiene `CREATE` sobre el esquema: la aplicación
+  consulta, no migra.
+- **`pagaya.local_id`**, variable de sesión fijada por transacción. Si no está,
+  `pagaya.local_actual()` es `NULL`, `local_id = NULL` no es verdadero para
+  ninguna fila y la consulta **no ve nada**. El caso por defecto es cero filas,
+  no todas.
+- **`pagaya.entre_locales`**, variable de sesión apagada por defecto que abre el
+  paso entre locales para lo único que lo necesita de verdad: dar de alta un
+  local y la carga inicial (F1-05). Hay que escribirla, y la capa de acceso
+  exige un motivo para hacerlo.
+
+Las condiciones, las dos verificadas por pruebas de integración:
+
+1. **El rol que conecta no puede ser superusuario.** Un superusuario esquiva la
+   row level security entera, `FORCE` incluido, y las tres piezas de arriba se
+   vuelven falsas sin que nada falle. Está en `ambientes/README.md` y
+   `.env.ejemplo`, lo hace la integración continua, y una prueba lo exige en voz
+   alta.
+2. **`FORCE ROW LEVEL SECURITY` en toda tabla**, para que el dueño del esquema
+   —que es el mismo rol que conecta— también quede sujeto. Es lo que convierte
+   "alguien consultó sin pasar por la capa" en **cero filas**, que se nota, en
+   vez de **las filas de todos los locales**, que no.
+
+La tabla `local` es el único caso especial, porque su clave de inquilino es su
+propio `id`: un local **se lee y se configura a sí mismo** —RF-A-07, RF-A-09 y
+RF-A-12 son del administrador de ese local—, pero no puede darse de alta, darse
+de baja ni mudarse al `id` de otro. Quién, dentro del local, tiene derecho a
+configurarlo es otra pregunta y otra capa: roles y sesiones son **F1-03**. La
+row level security responde "de qué local es esta fila", no "quién es esta
+persona", y confundir las dos es cómo se termina con una autorización que vive
+en dos lugares y difiere en uno.
+
+Dos piezas más, que son las que hacen que esto sobreviva a la tarea 40:
+
+- **`pagaya.activar_aislamiento('pagaya.mesa')`**, una llamada al final de la
+  migración que crea cada tabla. Verifica que la tabla tenga `local_id uuid NOT
+  NULL` con referencia a `local`, enciende RLS, la fuerza, crea la política y da
+  los permisos. Son cinco pasos y basta con olvidar uno —típicamente `FORCE`—
+  para que el aislamiento sea una creencia.
+- **`pagaya.tablas_sin_aislamiento()`**, la guardia: devuelve las tablas del
+  esquema que deberían estar aisladas y no lo están, con el motivo exacto. Una
+  prueba de `make verify` falla si devuelve algo. Las excepciones deliberadas
+  —`migracion`, `local`, la propia tabla de excepciones— viven como filas en
+  `pagaya.tabla_sin_local`, con su motivo: pedir una excepción es escribirla y
+  que alguien la revise.
+
+**La primera excepción prevista ya tiene nombre: las tablas de identidad.**
+**§9.3** lo decidió antes que esta tarea y con un argumento de producto, no de
+comodidad: PRD-001 §12 da el "local al que pertenece" solo a meseros y
+administradores, y PRD-004 §3 hace de una cuenta de cliente una persona —una por
+número de teléfono—, que no pertenece a ningún local. Por local es lo que cuelga
+de ella: la visita, el nivel, el participante de comanda, la asignación de
+mesas.
+
+La consecuencia concreta para este mecanismo es que **`activar_aislamiento` no
+les sirve**: exige `local_id uuid NOT NULL`, y §9.3 pide `usuario.local_id`
+**nulo para el cliente y obligatorio para el personal**. La migración que cree
+esas tablas tiene entonces dos obligaciones, y ninguna es opcional: escribir su
+política a mano —personal, el de su local; cliente, sin comparación de local,
+porque lo que lo ata a uno es estar sentado en una comanda de ese local, que es
+un hecho más fuerte que un campo (§9.2)— y **dejar su fila en
+`pagaya.tabla_sin_local` con ese motivo**, para que la guardia siga en verde por
+una decisión escrita y no por un descuido. El `porHuellaDeToken` de §9.3 es la
+única búsqueda del sistema que legítimamente no filtra por local, porque es la
+que *establece* de qué local es la petición: corre, por eso, antes de que haya
+un local que fijar, y le toca `sinLocal` (§10.2).
+
+**Lo que esto no es.** No es una frontera de privilegio contra nuestro propio
+código: quien puede abrir una transacción puede encender `entre_locales`. Lo que
+compra la row level security acá es que **el caso por defecto sea cero filas** y
+que cruzar de local haya que escribirlo. La frontera dura necesitaría una
+segunda credencial —un rol de operación con su propia contraseña, que la API no
+tiene—, y eso es una decisión de despliegue que hoy no se puede verificar en
+ninguna parte: queda nombrada acá y se toma cuando exista producción (S-6).
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Filtrar por `local_id` en cada consulta, sin row level security | Es exactamente lo que AT-1 descarta por escrito: *"el aislamiento no puede depender de que nadie olvide un `WHERE`"*. Y el olvido no se ve en la revisión —una consulta sin `WHERE local_id` compila, pasa las pruebas con un local y devuelve de más recién cuando hay dos. |
+| Pasar el `local_id` como parámetro a cada función de repositorio | Mejor que nada, pero el parámetro se puede pasar mal: `obtenerComanda(localDelMesero, comandaDeOtroLocal)` es un error de tipos imposible de detectar, porque los dos son `uuid`. La variable de sesión se fija **una vez por transacción**, donde la sesión del usuario ya está resuelta. |
+| Una base de datos (o un esquema) por local | Aísla mejor y cuesta su peso: migrar N bases en cada despliegue, N pools, y reportes entre locales que dejan de ser una consulta. Para un piloto de un local es infraestructura por adelantado; si algún día un cliente grande lo exige, `local_id` no estorba para llegar ahí. |
+| Un rol de PostgreSQL por local | El aislamiento sería del motor, pero el alta de un local pasaría a ser un `CREATE ROLE` y un cambio de credenciales, y el pool dejaría de poder reusar conexiones entre locales. Se paga un problema de operación para resolver uno de consulta. |
+| Un rol `pagaya_operador` con su política, en vez de la variable `entre_locales` | Se probó y no funciona como promete: PostgreSQL aplica una política `TO rol` a cualquier **miembro** del rol, y el rol que conecta tiene que ser miembro para poder hacerle `SET ROLE`. Resultado: una consulta cruda sin pasar por la capa veía todos los locales. La variable de sesión deja el caso por defecto en cero. |
+| `BYPASSRLS` para el camino entre locales | Crear un rol con ese atributo exige superusuario de verdad, que varias bases administradas no entregan. Una variable de sesión consigue lo mismo y se lee en el `\d` de la política. |
+
+**Consecuencias.**
+
+- El alta de la base deja de ser trivial: un rol sin superusuario y con
+  `CREATEROLE`. Está escrito en dos lugares y comprobado en uno.
+- Una migración que necesite tocar datos de negocio tiene que encender
+  `pagaya.entre_locales` o cambiar a `pagaya_app` con un local fijado; si no,
+  no ve nada. Es incómodo una vez y correcto siempre.
+- La política se evalúa en cada consulta. Toda tabla de negocio va a querer sus
+  índices **encabezados por `local_id`**; no se crea uno automático porque un
+  índice solo de `local_id` no sirve de nada cuando hay un local, y el índice
+  compuesto que sí sirve lo sabe la tarea que crea la tabla.
+
+### 10.2 AT-13 — La capa única: una transacción, un local
+
+**Qué lo exige.** La misma frase de AT-1 ("una única capa de acceso"), y §8.6,
+que dejó explícitamente a F1-02 la decisión de cómo se consulta.
+
+**Decisión.** `crearAcceso(configuracion)` en `@pagaya/base-datos` devuelve tres
+entradas y ninguna más. No hay consulta fuera de una transacción, y no hay
+transacción sin decir desde dónde se mira:
+
+| Entrada | Qué hace | Para qué |
+|---|---|---|
+| `conLocal(local, …)` | Fija `pagaya.local_id` y cambia a `pagaya_app` | El camino normal: toda petición de un cliente, un mesero o un administrador |
+| `sinLocal(…)` | Solo cambia de rol | Lo que ocurre **antes** de saber de qué local es la petición: autenticar un token (`porHuellaDeToken`, §9.3). Sobre una tabla aislada ve cero filas, y eso es correcto, no un error que haya que rodear |
+| `entreLocales(motivo, …)` | Enciende `pagaya.entre_locales` | Alta de un local y carga inicial (F1-05). Exige un motivo escrito |
+
+Lo demás de la decisión:
+
+- **SQL a mano con parámetros posicionales.** Sin constructor de consultas y sin
+  ORM, por las mismas razones de AT-7: lo que este esquema necesita —índices
+  únicos parciales, `CHECK` compuestos, disparadores, row level security— es lo
+  que los generadores expresan peor, y tener el modelo declarado en dos idiomas
+  es la forma más cara de equivocarse. La transacción expone `consulta` y `una`,
+  nada más.
+- **El pool no sale del paquete.** `@pagaya/base-datos` no exporta `crearPool`
+  ni el cliente de `pg`. Sumado a que `pg` solo puede entrar por ese paquete
+  (`fronteras.json`, `dependencias_externas`), no queda forma de hablar con la
+  base sin decir desde qué local se mira. Una prueba compara la lista de
+  exportaciones del paquete: la frontera que no se verifica se pierde.
+- **La transacción muere con su bloque.** Guardarla y usarla después falla con
+  un error tipificado, porque la variable de sesión ya no está y la consulta
+  correría sin local.
+- **El motivo de `entreLocales` se le entrega a quien lleve la constancia**, por
+  un callback opcional. Hoy no va a ningún lado a propósito: el registro de
+  auditoría append-only es **F1-04** (PRD-001 §14), y engancharlo antes de que
+  exista sería inventarle la forma.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Un ORM (Prisma, Drizzle, TypeORM) | Mismo motivo que AT-7 para las migraciones, más uno propio: la variable de sesión por transacción hay que inyectarla igual, y hacerlo a través del ciclo de vida de conexiones de un ORM es más frágil que hacerlo con `BEGIN` y `SET LOCAL` propios. |
+| Un constructor de consultas (Kysely, Knex) | Es la opción razonable que más cuesta descartar: da tipos sobre el esquema sin esconder el SQL. Se descarta por ahora porque el esquema todavía no existe —no hay de dónde generar los tipos— y porque agrega una dependencia en el camino crítico de `make verify`. Se reconsidera cuando haya tablas de verdad; no cambiaría esta capa, se metería adentro. |
+| Exponer el pool y que cada módulo abra sus transacciones | Es volver a "que nadie olvide el `WHERE`", con un paso más: que nadie olvide el `SET LOCAL`. |
+| Un `AsyncLocalStorage` con el local de la petición, implícito | Cómodo y peligroso: el local deja de verse en la firma de la función y aparece una clase nueva de error —"esta tarea de fondo corrió sin contexto"— que no se detecta leyendo el código. Pasarlo explícito cuesta una línea. |
+| Permitir consultas sueltas fuera de transacción | Una consulta fuera de transacción no puede tener `SET LOCAL`, así que correría sin local. Prohibirlo es lo que hace que la regla no tenga excepciones que recordar. |
+
+**Consecuencias.**
+
+- Todo acceso a datos queda dentro de un bloque, lo que de paso hace que la
+  transacción sea la unidad por defecto. Es lo que AT-2 y AT-4 necesitan: el
+  evento del outbox y el registro de auditoría se escriben **en la misma
+  transacción** que el cambio, y acá no hay forma de que no sea así.
+- Una petición que necesite dos locales no existe en el MVP. Si apareciera, es
+  `entreLocales` con su motivo, y el motivo se lee en la revisión.
+
+### 10.3 AT-14 — La configuración del local es un documento, no una columna por PRD
+
+**Qué lo exige.** PRD-001 §12 (el Local guarda "datos, impuestos, medios de
+pago, configuración de niveles") y cada PRD desde entonces: PRD-002 §6 agrega
+propina sugerida, tope de propina libre y política de rotación del PIN;
+PRD-003 §5 agrega flags de medios por proveedor; PRD-004 §8 agrega el canal de
+OTP; PRD-006 §4 agrega el tope de descuento por comanda; PRD-007 §4 **reemplaza**
+los flags de PRD-003 por `enrutamiento_por_medio` y agrega
+`plazo_confirmacion_transferencia`.
+
+**Decisión.** `local.configuracion` es un `jsonb` que arranca vacío. Cada clave
+la agrega la tarea que la usa, con su validación en el borde que la lee. Y una
+regla que la acota: **lo que sostiene una invariante no vive ahí**. Dinero,
+identidad y aislamiento son columnas con su restricción; `configuracion` guarda
+lo que el administrador cambia sin desplegar y cuya forma todavía se mueve.
+
+Por el mismo criterio, `local` tiene hoy `nombre` y nada más de "datos del
+local": el RUT, la dirección y los datos de boleta que RF-A-09 y PRD-002 §5.5
+van a pedir llegan con la tarea que los usa. Una columna que nadie llena en toda
+la Fase 1 es una columna que el día que se use va a estar llena de nulos y de
+suposiciones.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Una columna tipada por campo | Es lo correcto cuando el conjunto de campos es estable, y acá demostradamente no lo es: cuatro PRDs lo cambiaron y uno de ellos **borró** campos del anterior. Serían cuatro migraciones de columnas que ninguna invariante usa. Vuelve a ser la opción correcta en cuanto un campo empiece a sostener una restricción. |
+| Una tabla clave-valor por local | Es un `jsonb` peor: pierde los tipos igual, agrega un `JOIN` a cada lectura y hace que leer la configuración completa sea una consulta con pivote. |
+| Un archivo de configuración por local | Lo descarta AT-8 por escrito: *"un local no es un ambiente, y cambiarle un umbral no puede exigir un despliegue"*. RF-A-07, RF-A-09 y RF-A-12 son del administrador, no del equipo. |
+| `jsonb` validado con un esquema JSON en un `CHECK` | Tentador, pero congela en una migración inmutable la forma de algo que cambia con cada PRD. La validación vive donde se lee, que es donde se sabe qué se espera. |
+
+**Consecuencias.** La base no puede rechazar una clave mal escrita en
+`configuracion`; eso tiene que hacerlo la lectura, y la tarea que agregue una
+clave tiene que agregar su validación y su valor por defecto. Es el precio
+aceptado, y es aceptable **solo** mientras se respete la regla de que nada con
+una invariante detrás viva ahí.
+
+### 10.4 AT-15 — La fecha del local la calcula la base
+
+**Qué lo exige.** PRD-001 §13: *"zona horaria y turnos por local, porque 'visita
+del día' y 'ventas del día' dependen de eso"*. PRD-001 §8: *"máximo **una visita
+por día por local**, para evitar inflado"*. RF-A-06: ventas del día. PRD-006 §2,
+regla 7: máximo un descuento por cliente **por día por local**.
+
+**Decisión.** `local.zona_horaria` guarda un nombre IANA
+(`America/Santiago`), validado con un `CHECK` al escribirlo, y
+`pagaya.fecha_local(local, instante)` devuelve el día calendario de ese local.
+Las tres reglas de arriba se escriben contra esa función y no contra `::date` de
+un `timestamptz`, que daría el día del servidor.
+
+Validar la zona horaria parece exagerado hasta que se piensa el fallo: un nombre
+mal escrito no se nota al guardarlo, y el día que alguien calcule una fecha, o
+la consulta revienta en hora punta o —peor— alguien la "arregla" cayendo a UTC y
+el cierre de caja de un sábado queda partido en dos días.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Guardar un desfase fijo (`-03:00`) | Chile cambia de hora dos veces al año y la Isla de Pascua está en otro huso. Un desfase fijo es correcto seis meses al año. |
+| Calcular la fecha en TypeScript | Se puede, pero entonces la regla "una visita por día por local" no se puede expresar como un índice único en la base, y vuelve a ser una comprobación que alguien puede saltarse. Es el mismo argumento de AT-4. |
+| `SET TIME ZONE` por sesión, según el local | Cambia el significado de **toda** consulta de la transacción, incluidos los `now()` de auditoría, que deberían ser absolutos. Una función explícita afecta solo donde se la llama. |
+| Dejarlo para cuando haya reportes (Fase 4) | La visita y el tope diario de descuento son de Fase 3 y de PRD-006, no de Fase 4, y los dos ya preguntan "¿qué día es en el local?". |
+
+**Consecuencias.** Queda un supuesto que ningún PRD responde y que se registra
+como **S-11**: el día operativo es el **día calendario** del local. Un restaurante
+que cierra a las 02:00 tiene dos "días operativos" en una misma noche, y la
+visita de quien pagó a las 01:30 cae al día siguiente. Nada en los PRDs dice lo
+contrario, así que se construye así; cambiarlo es agregar un corte configurable
+y es un PRD, no un parche.

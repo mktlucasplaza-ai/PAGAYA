@@ -23,9 +23,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: pagaya
-          POSTGRES_PASSWORD: pagaya
-          POSTGRES_DB: pagaya_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
@@ -37,6 +37,9 @@ jobs:
     env:
       PAGAYA_AMBIENTE: dev
       # Credenciales de una base de datos efímera que vive y muere con este job.
+      # El rol `pagaya` lo crea el paso de abajo y NO es superusuario: un
+      # superusuario esquiva la row level security y el aislamiento entre
+      # locales dejaría de estar verificado (arquitectura.md AT-12).
       PAGAYA_BD_URL: postgres://pagaya:pagaya@localhost:5432/pagaya_ci
       PAGAYA_FIRMA_SESION: solo-para-integracion-continua
       # Sin esto, una base de datos mal configurada haría que las pruebas de
@@ -54,6 +57,18 @@ jobs:
         with:
           node-version: 24
           cache: npm
+
+      # La imagen de postgres crea su POSTGRES_USER como superusuario, y un
+      # superusuario no está sujeto a la row level security. El rol con el que
+      # conecta PAGAYA se crea acá, sin SUPERUSER, igual que en una máquina
+      # (ver ambientes/README.md). Una prueba de `make verify` lo comprueba.
+      - name: Rol de servicio sin superusuario
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE pagaya LOGIN CREATEROLE PASSWORD 'pagaya';" \
+            -c "CREATE DATABASE pagaya_ci OWNER pagaya;"
 
       - name: make verify
         run: make verify

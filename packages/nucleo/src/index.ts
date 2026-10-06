@@ -14,6 +14,7 @@ import { randomBytes } from "node:crypto";
  * motivo, y un motivo en prosa libre no se puede contar ni alertar.
  */
 export type CodigoError =
+  | "acceso_invalido"
   | "configuracion_invalida"
   | "migracion_invalida"
   | "sesion_invalida"
