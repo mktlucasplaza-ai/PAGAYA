@@ -18,6 +18,7 @@ export type CodigoError =
   | "configuracion_invalida"
   | "migracion_invalida"
   | "sesion_invalida"
+  | "carga_invalida"
   | "no_implementado";
 
 /** Error con código estable. `detalle` es para el humano, `codigo` para la máquina. */

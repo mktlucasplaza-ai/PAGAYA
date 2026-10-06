@@ -347,6 +347,9 @@ cuenta como visita. Las dos dicen qué las reabriría como PRD.
 | S-10 | Vigencia de sesión: **cliente 180 días deslizantes**, **mesero 16 h** y **admin 12 h** no deslizantes, **sin cuenta 12 h** deslizantes (§9.1). | PRD-001 §14 exige "sesiones por rol" y PRD-004 §3 exige que la del cliente sea persistente, pero ningún PRD fija los números. La forma —deslizante para el cliente, de una jornada para el personal— es la decisión; los plazos son configuración y se calibran con la operación. Muy corto en el cliente, se gasta OTP de más, que es el costo variable que PRD-004 §3 quiere bajar; muy largo en el personal, un teléfono olvidado en la barra queda con sesión abierta. |
 | S-11 | **El día operativo del local es su día calendario** en su zona horaria (§10.4). | Ningún PRD lo dice y tres reglas dependen de ello: "una visita por día por local" (PRD-001 §8), "ventas del día" (RF-A-06) y "un descuento por cliente por día por local" (PRD-006 §2, regla 7). Un restaurante que cierra a las 02:00 parte la noche en dos días, y la visita de quien pagó a las 01:30 cae al día siguiente. Si eso importa en el piloto, el arreglo es un corte configurable por local y **es un PRD**, no un parche: cambia qué cuenta como visita. |
 | S-12 | **El mismo rol conecta y migra**, y no es superusuario (§10.1). | Ningún PRD habla de roles de base de datos. Lo que sí es innegociable es que el rol que conecta no sea superusuario: un superusuario esquiva la row level security y el aislamiento entre locales deja de existir en silencio. Separar el rol que migra del que sirve es mejor y es un `GRANT` en el alta de la base, no una migración: la migración 0002 le concede `pagaya_app` a quien la corre. |
+| S-13 | **Una mesa tiene a lo más un mesero por turno**, y el cargador rechaza el archivo que diga otra cosa (§11.1). | PRD-001 §9 manda cada aviso "al mesero de la mesa", en singular, y escala al administrador cuando *no hay* asignación; RF-A-04 asigna mesas a meseros. Nadie lo escribió como regla. Si el local necesita mesas compartidas entre dos meseros, es un PRD nuevo: hay que definir quién recibe RF-M-02 y RF-M-03 y quién responde. |
+| S-14 | **El token del QR se deriva de (local, número de mesa)** cuando el archivo no lo declara (§11.1). | Si el cargador lo sorteara, la segunda corrida cambiaría el QR impreso de todas las mesas. Que sea derivable no lo debilita: el QR identifica y no autentica (PRD-003 §3.1), y el control de "estoy sentado acá" es el PIN (PRD-002 §3.1). Un local que prefiera un token opaco —o que vaya a renumerar mesas— lo declara en el archivo. |
+| S-15 | **El cargador no borra nada**: lo que el archivo ya no nombra se reporta como huérfano, salvo las asignaciones de los turnos que el archivo declara (§11.2). | PRD-001 §12: los ítems de comandas viejas referencian al producto y guardan el precio del momento. Borrar en una carga rutinaria es irreversible y silencioso. Si hay que retirar un producto de verdad, lo hará el panel de la Fase 4 (RF-A-01) con su auditoría. |
 
 ---
 
@@ -1056,3 +1059,141 @@ que cierra a las 02:00 tiene dos "días operativos" en una misma noche, y la
 visita de quien pagó a las 01:30 cae al día siguiente. Nada en los PRDs dice lo
 contrario, así que se construye así; cambiarlo es agregar un corte configurable
 y es un PRD, no un parche.
+## 11. La carga del local piloto (F1-05)
+
+Lo exige **F1-05** del [backlog](backlog-fase-1.md): *"carga inicial del local
+piloto por script: carta, mesas, QR, meseros y asignaciones"*, que **sustituye
+por ahora a RF-A-01 a RF-A-04**, los requisitos del panel de administración que
+llegan en la Fase 4 (PRD-001 §18). Hasta entonces, el local piloto se configura
+con un archivo versionado y un comando.
+
+No es una tarea menor por ser "solo un script": de F1-05 dependen F1-30 (la
+carta del cliente) y F1-60 (las mesas del mesero), así que es el primer lugar
+donde el modelo de datos de PRD-001 §12 se escribe como algo concreto.
+
+```
+AT-16 Contrato ──── el archivo del local es un contrato, y validarlo es la mitad
+AT-17 Plan ──────── la idempotencia se calcula; la escritura, detrás de un puerto
+```
+
+### 11.1 AT-16 — El archivo del local es un contrato, y validarlo es la mitad
+
+**Qué lo exige.** Lo que entra por acá es lo que RF-A-01 a RF-A-04 van a
+administrar después: categorías, productos con precio y variantes (RF-A-01),
+mesas y zonas con su QR (RF-A-02), usuarios del local (RF-A-03) y asignaciones
+por turno (RF-A-04). Y lo que se cargue mal no se nota en la carga: se nota
+cuando un cliente ve un precio equivocado (RF-C-03) o cuando un aviso de mesa no
+le llega a nadie (PRD-001 §9).
+
+**Decisión.** Un archivo **JSON versionado en el repositorio**
+(`packages/carga-inicial/datos/local-piloto-demo.json`), con `"formato": 1` y
+sin identificadores inventados: cada entidad se nombra por su **clave natural**
+—el slug de la categoría, el sku del producto, el número de la mesa, el código
+del mesero, `(turno, mesa)` para la asignación—. El validador no es un chequeo
+de tipos: es donde viven las reglas que los PRDs ya fijaron.
+
+- **Se reportan todos los problemas, no el primero.** Un cargador que falla de a
+  un error por corrida convierte cada tipeo en un viaje de ida y vuelta con el
+  humano, que es justo lo que F1-05 viene a ahorrar.
+- **Una clave desconocida es un error, no algo que se ignora.** Un `"precios"`
+  donde iba `"precio"` que pasa en silencio es un supuesto no escrito: el archivo
+  dice una cosa y la base guarda otra.
+- **La zona horaria tiene que ser una zona IANA en su forma canónica.** PRD-001
+  §13 y §8: "visita del día" y "ventas del día" dependen de ella, así que un
+  `America/Santiaago` corre el corte del día del local y no se descubre hasta el
+  primer reporte.
+- **Los precios son enteros**: el peso chileno no tiene decimales, y un `4500.5`
+  que redondee en algún lado es una cuenta que no cuadra.
+- **Un teléfono por mesero**, porque PRD-004 §3 y RF-C-02 (mod.) establecen una
+  cuenta por número: dos meseros con el mismo número serían la misma cuenta con
+  dos nombres.
+- **Integridad referencial dentro del archivo**: un producto apunta a una
+  categoría declarada, una mesa a una zona declarada, una asignación a un turno,
+  un mesero y una mesa declarados.
+- **Lo que no impide cargar pero alguien tiene que ver sale como aviso**: una
+  mesa sin mesero en un turno (sus avisos escalan al administrador, PRD-001 §9)
+  o una categoría sin productos (la carta la mostraría vacía).
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| `INSERT` escritos a mano, o una migración con los datos del local | Mezcla esquema con contenido: la migración es inmutable (AT-7) y la carta cambia cada semana. Y no hay dónde poner una validación: el primer error se descubre con la carta publicada. |
+| Un CSV por entidad (como lo exporta una planilla) | Cómodo para el local, malo para las variantes y las asignaciones, que son anidadas; y no hay un lugar donde declarar la versión del formato. Si algún día el local entrega planillas, se convierten a este JSON, que es el contrato. |
+| YAML | Más agradable de escribir y con dos trampas conocidas —la indentación y los valores que parecen otra cosa—, a cambio de una dependencia para leerlo. JSON lo lee la plataforma. |
+| Un esquema JSON Schema con su validador de terceros | Verifica forma, no reglas: no sabe que el peso no tiene decimales, que la zona horaria tiene que ser canónica ni que una mesa tiene un solo mesero por turno. Terminaríamos con la mitad de las reglas en el esquema y la otra mitad en código, y una dependencia más. |
+| Semillas escritas en TypeScript, como código | `tsc` las revisaría, pero volverían a ser código: cambiar un precio sería un cambio de programa, y el día que el administrador quiera cargar su carta no hay archivo que mandarle. |
+| Adelantar un panel mínimo de la Fase 4 | Es la tarea que el backlog pone en la Fase 4 por una razón: un panel necesita identidad, roles y sesiones (F1-03) y pantallas. F1-05 son tres días y desbloquea F1-30 y F1-60. |
+
+### 11.2 AT-17 — La idempotencia se calcula; la escritura vive detrás de un puerto
+
+**Qué lo exige.** F1-05 pide que correr el cargador dos veces no duplique nada.
+Y PRD-001 §12 obliga a algo menos obvio: los datos que carga **conviven con la
+operación**. Un ítem de comanda guarda el precio al momento del pedido y
+referencia a su producto; una mesa tiene estado (PRD-001 §15); RF-M-12 deja que
+el mesero marque un producto como agotado en medio del servicio. El cargador
+corre un martes a las nueve de la noche, no sobre una base vacía.
+
+**Decisión.** El cargador **no escribe: planifica**. Lee el estado que ya
+existe, lo compara por clave natural contra el archivo y produce una lista de
+cambios —`crear`, `actualizar`, `baja`— que recién entonces se aplica.
+
+- **La idempotencia es una propiedad verificable, no una promesa**: aplicar el
+  plan y volver a planificar sobre el estado resultante da una lista vacía. Es
+  lo que prueba `plan.prueba.ts`, y con cero cambios **no se abre ninguna
+  transacción**.
+- **`producto.disponible` se escribe solo al crear.** Es la consecuencia directa
+  de RF-M-12: si el cargador reescribiera la disponibilidad, correrlo a las
+  nueve volvería a poner en la carta el pescado que se acabó a las ocho. La
+  disponibilidad es estado de operación, no configuración.
+- **El cargador no borra.** Lo que existe en la base y el archivo ya no nombra se
+  reporta como **huérfano** y se deja quieto: un producto retirado de la carta
+  sigue referenciado por los ítems de comandas viejas (PRD-001 §12). La única
+  excepción son las asignaciones de los turnos que el archivo **sí** declara,
+  porque reasignar mesas es exactamente lo que RF-A-04 pide poder hacer.
+- **Todo el plan se aplica en una transacción.** Un archivo cargado a medias deja
+  mesas sin zona y asignaciones sin mesero, y la corrida siguiente ya no puede
+  distinguir eso de un archivo editado a mano.
+- **El orden del plan es parte del contrato** (`ORDEN_ENTIDADES`): la zona antes
+  que la mesa que la referencia, la categoría antes que su producto. Quien
+  implemente el puerto puede escribir el plan tal como viene.
+- **La escritura vive detrás del puerto `RepositorioCarga`**, con dos métodos:
+  leer el estado del local y escribir los cambios. Es la misma forma que AT-7 usa
+  para las migraciones, y por la misma razón: permite probar la validación y la
+  idempotencia **sin una base de datos encendida**.
+- **El adaptador de PostgreSQL entra por `entreLocales`** (§10.2), que AT-13 dejó
+  nombrada justamente para esto: dar de alta un local no puede filtrar por un
+  `local_id` que todavía no existe, y la carga del resto escribe sobre un local
+  que recién se creó en la misma corrida. Lo que falta para escribirlo no es la
+  capa de acceso —F1-02 ya entregó `pagaya.local`, la RLS forzada y las tres
+  entradas— sino **las tablas de la carta, las zonas, las mesas, el personal, los
+  turnos y las asignaciones**, que nacen con las tareas que las usan (la mesa con
+  F1-10) y que el cargador no crea: una herramienta no decide el modelo de datos.
+  Hasta entonces el comando `cargar` **falla diciéndolo**, con el código
+  `no_implementado`, y `plan` muestra qué escribiría. Un cargador que cargara en
+  memoria y dijera que terminó sería un auto-reporte.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Borrar todo lo del local y volver a insertarlo | Es la forma más simple de ser idempotente y la más fácil de confundir con un desastre: se lleva la disponibilidad que puso el mesero, los estados de mesa y, con las claves nuevas, la referencia de todo ítem de comanda ya existente (PRD-001 §12). |
+| `INSERT ... ON CONFLICT DO UPDATE` directo, sin plan | Es idempotente y no se puede mostrar antes de correrlo, ni probar sin una base de datos, ni distinguir "no cambió nada" de "cambió todo". Y pisaría `disponible` en cada corrida, que es justo lo que RF-M-12 no tolera. |
+| Identificadores (UUID) escritos en el archivo | Haría al archivo dueño de las claves primarias de la base y obligaría a inventar un UUID a mano por cada producto nuevo. La clave natural ya existe y es la que el local entiende: el número de la mesa. |
+| Marcar como no disponible lo que el archivo ya no nombra | Mezcla dos significados en un campo que RF-M-12 ya usa para otra cosa —"se acabó hoy"— y dejaría al mesero sin poder reponerlo. Un producto que sale de la carta es una decisión que alguien toma, no un efecto de borrar una línea. |
+| Aplicar los cambios de a uno, sin transacción | Deja estados intermedios que la corrida siguiente no sabe interpretar, y en una tarea cuyo único valor es ser repetible sin miedo. |
+| Conectar el puerto a PostgreSQL ahora, creando las tablas acá | El aislamiento por local ya está (§10), pero las tablas de negocio no, y crearlas desde el cargador sería decidir el modelo de datos de la carta y de la mesa desde una herramienta de carga —con una migración inmutable (AT-7) escrita de paso—. Nacen con la tarea que las usa, y el backlog ya ordena esas dependencias. |
+
+### 11.3 Lo que F1-05 no carga, y por qué
+
+- **El PIN de mesa.** No es configuración de la mesa sino de su **sesión**: se
+  genera y rota al abrirse y cerrarse (PRD-002 §3.1 y §3.4), y eso es F1-12. Un
+  PIN cargado por script sería un PIN que no rota.
+- **El estado de la mesa.** `libre | ocupada | …` es operación (PRD-001 §15), y
+  lo maneja F1-10. Si el cargador lo escribiera, una segunda corrida liberaría
+  una mesa ocupada.
+- **Niveles, topes de descuento, propinas y medios de pago** (RF-A-07, RF-A-09,
+  RF-A-18): son de las fases 2 y 3, y el archivo no los nombra para que nadie los
+  cargue "por si acaso" antes de que exista la regla que los usa.
+- **La URL del QR.** Se guarda el **token**; la URL se arma al imprimir (F1-11)
+  porque el host depende del ambiente (§8.4) y el dato guardado no.
+
+El ejemplo del repositorio es un local **ficticio** y se revisa como tal: una
+prueba verifica que todos sus teléfonos estén en un rango que no se asigna en
+Chile, para que nadie suba el número de alguien real junto con la carta.

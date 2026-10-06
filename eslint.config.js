@@ -93,7 +93,7 @@ export default tseslint.config(
     // imprime por su cuenta es un paquete que ensucia los registros de quien lo
     // use y no se puede probar.
     files: ["packages/**/*.ts"],
-    ignores: ["packages/**/*.prueba.ts", "packages/base-datos/src/cli.ts"],
+    ignores: ["packages/**/*.prueba.ts", "packages/*/src/cli.ts"],
     rules: { "no-console": "error" },
   },
   ...reglasDeFrontera,

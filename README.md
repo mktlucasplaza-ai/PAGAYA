@@ -33,8 +33,9 @@ Hace falta **Node 22.18 o superior** y **python3**. Nada más: no hay paso de
 compilación, ni empaquetador, ni marco de pruebas.
 
 ```sh
-make verify     # la única puerta: PRDs + lint + tipos + pruebas
-make migrar     # aplica las migraciones al ambiente de PAGAYA_AMBIENTE
+make verify         # la única puerta: PRDs + lint + tipos + pruebas
+make migrar         # aplica las migraciones al ambiente de PAGAYA_AMBIENTE
+make cargar-piloto  # valida el archivo del local piloto (F1-05) y muestra el plan
 ```
 
 `make verify` instala las dependencias si hace falta. Las pruebas que necesitan

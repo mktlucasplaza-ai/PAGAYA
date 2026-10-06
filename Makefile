@@ -4,7 +4,7 @@
 # pruebas. Agregar una verificación significa agregarla acá, no en otro comando
 # que alguien tiene que acordarse de correr.
 
-.PHONY: verify verificar-prds lint tipos pruebas instalar migrar limpiar
+.PHONY: verify verificar-prds lint tipos pruebas instalar migrar cargar-piloto limpiar
 
 # El python3 del PATH puede ser de otra arquitectura (en un Mac ARM con un
 # python3 x86_64 y sin Rosetta, falla con "Bad CPU type"). Se usa el primer
@@ -60,6 +60,13 @@ node_modules/.instalado: package.json package-lock.json $(wildcard packages/*/pa
 # de `verify`: verificar no escribe en ninguna base de datos.
 migrar: instalar
 	@$(NPM) run --silent migrar
+
+# Carga inicial del local piloto (F1-05). Tampoco es parte de `verify`, por lo
+# mismo que `migrar`: lo que `verify` revisa del cargador son sus pruebas.
+# ARCHIVO es opcional; sin él se usa el ejemplo versionado del repositorio.
+# COMANDO es validar (por defecto), plan o cargar.
+cargar-piloto: instalar
+	@node packages/carga-inicial/src/cli.ts $(or $(COMANDO),validar) $(ARCHIVO)
 
 limpiar:
 	@rm -rf node_modules
