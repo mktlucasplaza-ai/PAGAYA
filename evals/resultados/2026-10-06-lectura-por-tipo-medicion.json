@@ -1,0 +1,214 @@
+{
+  "nombre": "lectura-por-tipo-medicion",
+  "fecha": "2026-10-06",
+  "momento": "2026-10-06T23:21:02-03:00",
+  "base": {
+    "ref": "origin/main",
+    "sha": "27a597f4e5614fdd90190130ad67f4e9b60d7c02"
+  },
+  "modelo_candidato": "sonnet",
+  "juez": {
+    "modelo": "(por defecto de codex)",
+    "familia": "OpenAI / codex"
+  },
+  "rubric": {
+    "archivo": "evals/rubrics/convencion-prds.md",
+    "criterios": [
+      {
+        "id": "C-1",
+        "titulo": "Abrió `prds/README.md` antes de escribir nada",
+        "fallo_automatico": false
+      },
+      {
+        "id": "C-2",
+        "titulo": "Leyó los `## 0. Cambios en esta versión` de los PRDs anteriores",
+        "fallo_automatico": false
+      },
+      {
+        "id": "C-3",
+        "titulo": "No editó ni borró ningún PRD ya publicado",
+        "fallo_automatico": true
+      },
+      {
+        "id": "C-4",
+        "titulo": "El PRD nuevo nombra por ID cada requisito que modifica",
+        "fallo_automatico": false
+      },
+      {
+        "id": "C-5",
+        "titulo": "Corrió `make verify` después de su última edición",
+        "fallo_automatico": false
+      },
+      {
+        "id": "C-6",
+        "titulo": "Dejó escrito como supuesto o como `D-n` lo que decidió por su cuenta",
+        "fallo_automatico": false
+      }
+    ]
+  },
+  "instruccion": {
+    "archivo": "evals/prompts/cerrar-decision.md",
+    "sha256": "a9568b68b2b19e40"
+  },
+  "candidatos": [
+    {
+      "variante": "base",
+      "archivo_variante": "evals/variantes/claude-md-base.md",
+      "etiqueta_ciega": "A",
+      "directorio": "pagaya-comanda-2",
+      "costo_usd": 0.8235735000000002,
+      "turnos": 18,
+      "duracion_s": 232.7,
+      "expirado": false,
+      "llamadas_a_herramientas": 22,
+      "prds_publicados_tocados": [],
+      "archivos_nuevos": [
+        "prds/PRD-008-compartir-comentario-con-el-mesero.md"
+      ],
+      "criterios": [
+        {
+          "id": "C-1",
+          "titulo": "Abrió `prds/README.md` antes de escribir nada",
+          "puntaje": 2,
+          "fallo_automatico": false,
+          "evidencia": "Línea 1: Read de prds/README.md sin rango parcial. Primera creación: línea 10, cp de la plantilla a PRD-008.",
+          "justificacion": "Leyó el índice completo antes de escribir. La secuencia reconoce PRD-007 como antecedente vigente y crea PRD-008."
+        },
+        {
+          "id": "C-2",
+          "titulo": "Leyó los `## 0. Cambios en esta versión` de los PRDs anteriores",
+          "puntaje": 2,
+          "fallo_automatico": false,
+          "evidencia": "Línea 3: bucle sobre PRD-00[2-7]*.md con awk que extrae la sección ## 0.",
+          "justificacion": "Recorrió los cambios de PRD-002 a PRD-007 antes de la primera escritura, en la línea 10."
+        },
+        {
+          "id": "C-3",
+          "titulo": "No editó ni borró ningún PRD ya publicado",
+          "puntaje": 2,
+          "fallo_automatico": true,
+          "evidencia": "Hechos de git: ningún PRD publicado modificado o borrado. Las escrituras observables afectan PRD-008 y prds/README.md.",
+          "justificacion": "No hay evidencia de edición ni reversión de un PRD publicado. El diff solo agrega el nuevo PRD y actualiza el índice."
+        },
+        {
+          "id": "C-4",
+          "titulo": "El PRD nuevo nombra por ID cada requisito que modifica",
+          "puntaje": 2,
+          "fallo_automatico": false,
+          "evidencia": "PRD-008 §0 enumera RF-A-20, RF-M-19, RF-C-32 y D-18 como agregados; RF-M-11, RF-A-08, RF-C-11, RF-A-10 y D-5 como modificados; identifica el cierre de D-9.",
+          "justificacion": "Los requisitos funcionales nuevos y modificados del cuerpo aparecen por ID en los bloques correspondientes. Incluye los cambios de prioridad y la decisión abierta sobre eliminación."
+        },
+        {
+          "id": "C-5",
+          "titulo": "Corrió `make verify` después de su última edición",
+          "puntaje": 1,
+          "fallo_automatico": false,
+          "evidencia": "Última edición observable: línea 20. Línea 21: make verify. El cierre reproduce «verify: todo en verde», pero el expediente no incluye la salida de esa corrida.",
+          "justificacion": "Está demostrado que ejecutó el verificador después de editar. No puede comprobarse que pasó ni que la frase del cierre sea literalmente su última línea; ante esa falta de evidencia corresponde el puntaje menor."
+        },
+        {
+          "id": "C-6",
+          "titulo": "Dejó escrito como supuesto o como `D-n` lo que decidió por su cuenta",
+          "puntaje": 1,
+          "fallo_automatico": false,
+          "evidencia": "PRD-008 §8 marca D-18 con un supuesto explícito. En cambio, §2 fija destinatario, retiro, texto íntegro, anonimato y notificación sin identificarlos como supuestos o decisiones abiertas.",
+          "justificacion": "Documentó explícitamente el supuesto sobre eliminación de cuenta, pero otras decisiones propias quedaron como reglas resueltas. Llamarlas supuestos en el cierre no satisface la convención dentro del PRD."
+        }
+      ],
+      "total_bruto": 10,
+      "maximo": 12,
+      "nota_10": 8.3,
+      "fallo_automatico": false,
+      "resumen_del_juez": "10/12. Cumple la lectura previa, preserva los PRDs publicados y enumera los requisitos afectados. La evidencia de verificación es incompleta y varias decisiones propias carecen de marcado explícito."
+    },
+    {
+      "variante": "nueva",
+      "archivo_variante": "evals/variantes/claude-md-nueva.md",
+      "etiqueta_ciega": "B",
+      "directorio": "pagaya-comanda-25",
+      "costo_usd": 0.5711168,
+      "turnos": 17,
+      "duracion_s": 157.3,
+      "expirado": false,
+      "llamadas_a_herramientas": 16,
+      "prds_publicados_tocados": [],
+      "archivos_nuevos": [
+        "prds/PRD-008-compartir-comentario-con-el-mesero.md"
+      ],
+      "criterios": [
+        {
+          "id": "C-1",
+          "titulo": "Abrió `prds/README.md` antes de escribir nada",
+          "puntaje": 2,
+          "fallo_automatico": false,
+          "evidencia": "Línea 1: Read de prds/README.md sin rango parcial. Primera creación: línea 11, cp de la plantilla a PRD-008.",
+          "justificacion": "Leyó el índice completo antes de escribir. La secuencia identifica PRD-007 como antecedente y crea la siguiente versión."
+        },
+        {
+          "id": "C-2",
+          "titulo": "Leyó los `## 0. Cambios en esta versión` de los PRDs anteriores",
+          "puntaje": 2,
+          "fallo_automatico": false,
+          "evidencia": "Línea 3: bucle sobre PRD-00[2-7]*.md con awk desde ## 0. hasta ## 1.",
+          "justificacion": "Leyó las secciones de cambios de PRD-002 a PRD-007 antes de comenzar a escribir."
+        },
+        {
+          "id": "C-3",
+          "titulo": "No editó ni borró ningún PRD ya publicado",
+          "puntaje": 2,
+          "fallo_automatico": true,
+          "evidencia": "Hechos de git: ningún PRD publicado modificado o borrado. Líneas 11–14: creación y edición de PRD-008 y actualización del README.",
+          "justificacion": "No aparece ninguna edición temporal de un PRD publicado. El diff conserva todos los existentes."
+        },
+        {
+          "id": "C-4",
+          "titulo": "El PRD nuevo nombra por ID cada requisito que modifica",
+          "puntaje": 1,
+          "fallo_automatico": false,
+          "evidencia": "PRD-008 §0 enumera RF-A-20, RF-M-19, RF-C-32, RF-C-11, RF-M-11 y RF-A-08, pero declara «Registro de auditoría (PRD-001 §12)» sin identificar RF-A-10; §4 agrega el acto auditado.",
+          "justificacion": "Enumera gran parte de los requisitos, pero amplía el comportamiento de auditoría sin nombrar el requisito correspondiente por ID. La referencia a una sección no cubre esa exigencia."
+        },
+        {
+          "id": "C-5",
+          "titulo": "Corrió `make verify` después de su última edición",
+          "puntaje": 1,
+          "fallo_automatico": false,
+          "evidencia": "Última edición observable: línea 14. Línea 15: make verify con tail -4. El cierre contiene «verify: todo en verde», pero no se aporta la salida de la corrida.",
+          "justificacion": "La ejecución posterior a la última edición está demostrada. El éxito y la coincidencia literal con la última línea solo están afirmados por el candidato, por lo que no alcanzan para otorgar 2."
+        },
+        {
+          "id": "C-6",
+          "titulo": "Dejó escrito como supuesto o como `D-n` lo que decidió por su cuenta",
+          "puntaje": 1,
+          "fallo_automatico": false,
+          "evidencia": "PRD-008 §2.4 explicita S-1 a S-5 y §7 incluye D-18. Sin embargo, §2.1 decide «cualquier administrador del local», destinatario atribuido y texto sin edición; §2.2 fija anonimato y duración del acceso sin marcarlos como supuestos.",
+          "justificacion": "Marcó varias decisiones propias de forma explícita, pero no todas. Las decisiones restantes aparecen como alcance definitivo, aunque la instrucción no las resolvía."
+        }
+      ],
+      "total_bruto": 9,
+      "maximo": 12,
+      "nota_10": 7.5,
+      "fallo_automatico": false,
+      "resumen_del_juez": "9/12. Cumple la lectura previa y preserva los PRDs publicados. Falta el ID del requisito de auditoría, la salida verificable del verificador y el marcado de algunas decisiones propias."
+    }
+  ],
+  "comparacion_del_juez": "A obtiene 10/12 y B 9/12; ninguno activa el fallo automático de C-3. La diferencia acreditada está en C-4: A identifica RF-A-10 y B describe su cambio sin nombrarlo. Ambos dejan decisiones propias sin marcar y aportan evidencia insuficiente para acreditar completamente C-5.",
+  "divergencia": 0.8,
+  "criterios_divergentes": [
+    {
+      "id": "C-4",
+      "titulo": "El PRD nuevo nombra por ID cada requisito que modifica",
+      "puntajes": [
+        2,
+        1
+      ]
+    }
+  ],
+  "costo": {
+    "candidatos_usd": 1.3947,
+    "juez_tokens_entrada": 28983,
+    "juez_tokens_salida": 2344
+  },
+  "advertencias": [],
+  "resumen": "lectura-por-tipo-medicion — 2026-10-06\nbase origin/main @ 27a597f4 · candidato: sonnet · juez: (por defecto de codex)\n\nbase  (visto por el juez como A)  → 8.3/10\n    C-1 2/2  Abrió `prds/README.md` antes de escribir nada\n    C-2 2/2  Leyó los `## 0. Cambios en esta versión` de los PRDs anteriores\n    C-3 2/2  No editó ni borró ningún PRD ya publicado\n    C-4 2/2  El PRD nuevo nombra por ID cada requisito que modifica\n    C-5 1/2  Corrió `make verify` después de su última edición\n    C-6 1/2  Dejó escrito como supuesto o como `D-n` lo que decidió por su cuenta\n\nnueva  (visto por el juez como B)  → 7.5/10\n    C-1 2/2  Abrió `prds/README.md` antes de escribir nada\n    C-2 2/2  Leyó los `## 0. Cambios en esta versión` de los PRDs anteriores\n    C-3 2/2  No editó ni borró ningún PRD ya publicado\n    C-4 1/2  El PRD nuevo nombra por ID cada requisito que modifica\n    C-5 1/2  Corrió `make verify` después de su última edición\n    C-6 1/2  Dejó escrito como supuesto o como `D-n` lo que decidió por su cuenta\n\nDiferencia entre la nota más alta y la más baja: 0.8 puntos sobre 10.\n  criterio que divergió: C-4 El PRD nuevo nombra por ID cada requisito que modifica (2 vs 1)\n\nCosto observado: 1.3947 USD en los candidatos; juez 28983 tokens de entrada y 2344 de salida."
+}

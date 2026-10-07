@@ -14,7 +14,7 @@
   "scripts": {
     "lint": "eslint .",
     "tipos": "tsc --noEmit",
-    "pruebas": "node --test --test-reporter=spec \"packages/**/*.prueba.ts\" \"apps/**/*.prueba.ts\" \"scripts/**/*.prueba.ts\"",
+    "pruebas": "node --test --test-reporter=dot \"packages/**/*.prueba.ts\" \"apps/**/*.prueba.ts\" \"scripts/**/*.prueba.ts\"",
     "migrar": "node packages/base-datos/src/cli.ts migrar"
   },
   "devDependencies": {

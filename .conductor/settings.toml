@@ -39,7 +39,7 @@ señala problemas.
 
 # Lo que corre el botón Create PR.
 create_pr = """
-Título en español, una línea: qué decisión cierra o qué entrega. Cuerpo: qué
-cambió (archivos), salida completa de `make verify`, supuestos tomados y dónde
-quedaron escritos, qué queda abierto.
+Título en español, una línea: qué decisión cierra o qué entrega. Cuerpo en máximo
+15 líneas: qué cambió (archivos), supuestos tomados y dónde quedaron escritos,
+qué queda abierto, y la última línea de `make verify`.
 """
