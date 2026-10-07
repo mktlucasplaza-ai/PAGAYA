@@ -58,7 +58,13 @@ describe("la capa de acceso", () => {
     // podría consultar la base sin decir desde qué local se mira.
     assert.deepEqual(
       Object.keys(paquete).sort(),
-      ["aplicarMigraciones", "crearAcceso", "directorioMigraciones", "listarMigraciones"],
+      [
+        "aplicarMigraciones",
+        "crearAcceso",
+        "directorioMigraciones",
+        "listarMigraciones",
+        "migrarAmbiente",
+      ],
       "packages/base-datos/src/index.ts solo expone la capa de acceso y las migraciones",
     );
   });

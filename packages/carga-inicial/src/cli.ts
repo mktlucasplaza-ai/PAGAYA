@@ -7,18 +7,21 @@
  *   node packages/carga-inicial/src/cli.ts cargar  [archivo]
  *
  * Sin archivo se usa el ejemplo versionado del repositorio, que son datos
- * ficticios: así el comando se puede correr recién clonado el repositorio.
+ * ficticios: así `validar` se puede correr recién clonado el repositorio, sin
+ * base de datos ni ambiente.
  *
- * `cargar` falla a propósito mientras las tablas no existan: lo que escribe en
- * PostgreSQL es el adaptador del puerto `RepositorioCarga`, y ese adaptador
- * llega con esas tablas (ver docs/arquitectura.md §11.2). Un cargador que "cargara" en
- * memoria y dijera que terminó sería un auto-reporte, que es justo lo que
- * CLAUDE.md prohíbe.
+ * `plan` y `cargar` sí necesitan la base: desde F1-06 el plan se calcula contra
+ * el estado real del local —que es lo único que hace de la idempotencia una
+ * propiedad y no una promesa— y la escritura entra por `entreLocales`
+ * (docs/arquitectura.md §12, AT-19). `plan` no escribe nada: lee el estado,
+ * compara y muestra.
  */
+import { cargarConfiguracion } from "@pagaya/config";
+import { crearAcceso, type Acceso } from "@pagaya/base-datos";
 import { ErrorPagaya } from "@pagaya/nucleo";
 
-import { cargar, resumir } from "./plan.ts";
-import { repositorioMemoria } from "./repositorio-memoria.ts";
+import { cargar, planificar, resumir } from "./plan.ts";
+import { repositorioPostgres } from "./repositorio-postgres.ts";
 import { archivoEjemplo, validarArchivo, type Validacion } from "./validacion.ts";
 
 function validado(archivo: string): Validacion & { ok: true } {
@@ -46,6 +49,13 @@ function contar(resultado: Validacion & { ok: true }): void {
   );
 }
 
+/** El acceso del ambiente de `PAGAYA_AMBIENTE`. Lo cierra quien lo abre. */
+function abrirAcceso(): Acceso {
+  const config = cargarConfiguracion();
+  console.log(`ambiente ${config.ambiente}`);
+  return crearAcceso(config);
+}
+
 async function ejecutar(comando: string | undefined, archivo: string): Promise<void> {
   if (comando === "validar") {
     const resultado = validado(archivo);
@@ -54,34 +64,36 @@ async function ejecutar(comando: string | undefined, archivo: string): Promise<v
     return;
   }
 
-  if (comando === "plan") {
-    const resultado = validado(archivo);
-    contar(resultado);
-    // Contra un local vacío: es lo que haría la primera carga. El estado real
-    // sale de la base, y esas tablas todavía no existen.
-    const plan = await cargar(repositorioMemoria(), resultado.local);
-    console.log("\nplan sobre un local vacío:");
-    for (const linea of resumir(plan)) console.log(linea);
+  if (comando !== "plan" && comando !== "cargar") {
+    console.error(
+      "uso: node packages/carga-inicial/src/cli.ts validar|plan|cargar [archivo.json]",
+    );
+    process.exit(2);
     return;
   }
 
-  if (comando === "cargar") {
-    const resultado = validado(archivo);
-    contar(resultado);
-    throw new ErrorPagaya(
-      "no_implementado",
-      "el archivo es válido, pero todavía no hay dónde escribirlo: las tablas de la carta, " +
-        "las mesas y el personal no existen todavía. El aislamiento por local ya está " +
-        "(F1-02 dejó `entreLocales` nombrada para esta carga), así que lo que falta es la " +
-        "migración de esas tablas y el adaptador del puerto RepositorioCarga " +
-        "(docs/arquitectura.md §11.2). Mientras tanto, `plan` muestra qué escribiría.",
-    );
-  }
+  const resultado = validado(archivo);
+  contar(resultado);
 
-  console.error(
-    "uso: node packages/carga-inicial/src/cli.ts validar|plan|cargar [archivo.json]",
-  );
-  process.exit(2);
+  const acceso = abrirAcceso();
+  try {
+    const repositorio = repositorioPostgres(acceso);
+    if (comando === "plan") {
+      const estado = await repositorio.leerEstado(resultado.local.local.slug);
+      const plan = planificar(resultado.local, estado);
+      console.log(`\nplan sobre el estado actual (${estado.length} fila(s) en la base):`);
+      for (const linea of resumir(plan)) console.log(linea);
+      return;
+    }
+    const plan = await cargar(repositorio, resultado.local);
+    console.log("\naplicado:");
+    for (const linea of resumir(plan)) console.log(linea);
+    if (plan.cambios.length === 0) {
+      console.log("nada que escribir: el local ya está como dice el archivo");
+    }
+  } finally {
+    await acceso.cerrar();
+  }
 }
 
 try {

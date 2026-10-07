@@ -1,10 +1,14 @@
 /**
  * Repositorio en memoria.
  *
- * No es solo un doble de prueba: es lo que hace correr el comando `plan` hoy,
- * con las tablas de la carta y de la mesa todavía sin existir. El mismo objeto que usa la
- * prueba de idempotencia es el que usa el comando, así que lo que la prueba
- * verifica no es una maqueta aparte.
+ * Es el doble con el que se prueban la planificación y la idempotencia **sin una
+ * base de datos encendida**, que es la mitad del valor de que la escritura viva
+ * detrás de un puerto (arquitectura.md AT-17). Hasta F1-06 era además lo que
+ * hacía correr el comando `plan`, porque las tablas no existían; ahora el
+ * comando corre contra PostgreSQL (`repositorio-postgres.ts`) y esto vuelve a
+ * ser solo lo que siempre tuvo que ser. Las dos pruebas se necesitan: acá se
+ * verifica la mecánica del plan, y en `repositorio-postgres.prueba.ts` lo que
+ * solo puede afirmar la base.
  *
  * Guarda las filas por clave natural, igual que la base: escribir dos veces la
  * misma clave actualiza, no agrega. Si esta estructura permitiera duplicar una

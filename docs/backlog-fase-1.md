@@ -4,7 +4,7 @@
 |---|---|
 | **Fase** | 1 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md) — QR, ingreso, carta, comanda en vivo, pedido incremental, notificaciones al mesero, vista de mesas del mesero y entrega |
 | **Alcance según** | PRD-001 a PRD-005 (RF vigentes, con sus modificaciones aplicadas) |
-| **Estimación** | **130 días-persona** de un desarrollador senior (suma de esfuerzo, no plazo de calendario; ver supuestos 5 a 8) |
+| **Estimación** | **133 días-persona** de un desarrollador senior (suma de esfuerzo, no plazo de calendario; ver supuestos 5 a 8) |
 | **Fecha** | 2026-09-26 (estimación agregada el 2026-10-04) |
 
 > Este backlog **no define alcance**: lo traduce a tareas. Si algo de aquí
@@ -22,8 +22,9 @@
 | F1-03 | Roles (cliente, mesero, admin) y sesiones; acceso a la comanda limitado a la mesa y al personal del local | PRD-001 §14 | F1-02 | 5 d |
 | F1-04 | Registro de auditoría append-only, escrito en la misma transacción que el cambio | PRD-001 §14; datos para RF-A-10 y RF-A-15 | F1-02 | 2 d |
 | F1-05 | Carga inicial del local piloto por script: carta, mesas, QR, meseros y asignaciones | Sustituye por ahora a RF-A-01 a 04 (Fase 4) | F1-02 | 3 d |
+| F1-06 | Migración 0003 con las tablas que el archivo de carga escribe y que F1-10 y F1-30 leen | PRD-001 §12; las tablas de RF-A-01 a RF-A-04, sustituidos por ahora por F1-05 | F1-02, F1-05 | 3 d |
 
-**Subtotal E0: 20 d**
+**Subtotal E0: 23 d**
 
 ## E1 · Mesa y sesión de mesa
 
@@ -162,8 +163,8 @@ gestionarlo desde el primer día.
    estimación no serviría para la decisión que se quiere tomar (¿cuánto dura la
    Fase 1?). El costo asumido es que un día-persona de un senior es una unidad
    discutible; se discute una vez y vale para todo el backlog.
-7. **El total es suma de esfuerzo, no plazo de calendario.** 130 días-persona no
-   son 130 días hábiles de proyecto. Con la columna "Depende de" como grafo, la
+7. **El total es suma de esfuerzo, no plazo de calendario.** 133 días-persona no
+   son 133 días hábiles de proyecto. Con la columna "Depende de" como grafo, la
    cadena de dependencias más larga suma **46 d**:
    `F1-01 → F1-02 → F1-03 → F1-20 → F1-21 → F1-23 → F1-40 → F1-41 → F1-61 →
    F1-63`. Es decir: ni un equipo infinito termina la Fase 1 en menos de ~46
@@ -178,7 +179,7 @@ gestionarlo desde el primer día.
    porcentaje de riesgo repartido sobre el total: el riesgo está nombrado tarea
    por tarea en "Riesgos de estimación", con su rango. Si se necesita una cifra
    con colchón para comprometerla con un tercero, el rango pesimista de esas
-   cinco tareas suma **+41 d** sobre el esperado (171 d).
+   cinco tareas suma **+41 d** sobre el esperado (174 d).
 
 ## Riesgos de estimación
 

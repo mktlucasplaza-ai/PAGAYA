@@ -50,4 +50,12 @@ export {
   type RepositorioCarga,
 } from "./plan.ts";
 
+export { repositorioPostgres } from "./repositorio-postgres.ts";
+
+/**
+ * El doble en memoria. Dejó de ser lo que hace correr el comando —eso es
+ * `repositorioPostgres` desde F1-06— y quedó en lo que siempre fue: el
+ * repositorio contra el que se prueban la planificación y la idempotencia sin
+ * una base de datos encendida (docs/arquitectura.md §12, AT-19).
+ */
 export { repositorioMemoria, type RepositorioMemoria } from "./repositorio-memoria.ts";

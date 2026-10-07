@@ -7,7 +7,14 @@ import { Pool, type PoolClient } from "pg";
 
 import type { Configuracion } from "@pagaya/config";
 
-import type { Migracion, MigracionAplicada, RegistroMigraciones } from "./migraciones.ts";
+import {
+  aplicarMigraciones,
+  listarMigraciones,
+  type Informe,
+  type Migracion,
+  type MigracionAplicada,
+  type RegistroMigraciones,
+} from "./migraciones.ts";
 
 export function crearPool(config: Configuracion): Pool {
   return new Pool({
@@ -77,4 +84,28 @@ export function registroPostgres(cliente: PoolClient): RegistroMigraciones {
 /** Suelta el cerrojo que tomó `asegurarRegistro`. */
 export async function liberarCerrojoMigraciones(cliente: PoolClient): Promise<void> {
   await cliente.query(`SELECT pg_advisory_unlock($1)`, [CERROJO_MIGRACIONES]);
+}
+
+/**
+ * Aplica lo que falte al ambiente de `config`, con su pool y su cerrojo.
+ *
+ * Es el camino de `make migrar` y el que usa cualquier prueba de integración
+ * que necesite el esquema puesto, en este paquete o en otro: las pruebas corren
+ * en procesos separados y en paralelo, así que ninguna puede suponer que otra
+ * migró primero. El cerrojo de asesoría es lo que hace que dos que arranquen
+ * juntas no apliquen la misma migración dos veces.
+ *
+ * Vive acá y no en `migraciones.ts` por la misma razón que todo lo demás de
+ * este archivo: el pool no sale del paquete (AT-13).
+ */
+export async function migrarAmbiente(config: Configuracion): Promise<Informe> {
+  const pool = crearPool(config);
+  const cliente = await pool.connect();
+  try {
+    return await aplicarMigraciones(registroPostgres(cliente), listarMigraciones());
+  } finally {
+    await liberarCerrojoMigraciones(cliente).catch(() => undefined);
+    cliente.release();
+    await pool.end();
+  }
 }

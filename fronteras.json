@@ -175,9 +175,11 @@
       "ruta": "packages/carga-inicial",
       "capa": "aplicacion",
       "puede_importar": [
-        "@pagaya/nucleo"
+        "@pagaya/nucleo",
+        "@pagaya/config",
+        "@pagaya/base-datos"
       ],
-      "porque": "Carga inicial del local piloto (F1-05): valida el archivo del local y calcula el plan de escritura. Es un proceso que alguien corre a mano, como las migraciones, y nadie lo importa. Solo depende de núcleo porque la escritura vive detrás de un puerto: la arista a @pagaya/base-datos se agrega cuando F1-02 cree las tablas."
+      "porque": "Carga inicial del local piloto (F1-05): valida el archivo del local, calcula el plan y lo escribe. Es un proceso que alguien corre a mano, como las migraciones, y nadie lo importa. Importa @pagaya/base-datos porque F1-06 creó las tablas que el archivo escribe y el adaptador del puerto RepositorioCarga entra por `entreLocales`, la única entrada que puede dar de alta un local y escribir sobre el que acaba de crear (arquitectura.md §12, AT-19). Y @pagaya/config porque, como apps/api y apps/repartidor, es un proceso que carga su propio ambiente para saber a qué base le habla; el pool no sale de base-datos, así que no hay otra forma de construir el acceso."
     },
     "@pagaya/web": {
       "ruta": "apps/web",
