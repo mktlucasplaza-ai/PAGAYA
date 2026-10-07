@@ -38,6 +38,11 @@ archivo no dice cuál es el PRD vigente a propósito: se quedaría viejo.
 
 ## Orden de lectura al arrancar
 
+Primero identifica el tipo de tarea. Cada tipo tiene su propia lectura; no leas
+de más.
+
+### Tareas de PRD (Playbook A)
+
 1. `prds/README.md` — reglas e índice. Identifica el PRD vigente.
 2. La sección `## 0. Cambios en esta versión` de **cada** PRD desde el 002 hasta
    el vigente, en orden. Son cortas y te dan la evolución completa.
@@ -47,6 +52,18 @@ archivo no dice cuál es el PRD vigente a propósito: se quedaría viejo.
 
 No empieces a escribir antes del paso 3. Un PRD escrito sin conocer los
 anteriores contradice alguno; siempre.
+
+### Tareas de código o documentación (F1-nn, Playbook B)
+
+1. La fila de la tarea en `docs/backlog-fase-1.md`.
+2. `fronteras.json`, si la tarea toca código.
+3. De `docs/arquitectura.md`, solo §1 más las secciones y AT que la fila o el
+   prompt citen.
+4. Los RF que la fila cita se buscan con `grep` en `prds/`, no se lee el PRD
+   entero (p. ej. `grep -n "RF-C-03" prds/*.md`).
+
+No leas PRDs completos salvo que el prompt lo pida. Tampoco `prds/anexos/` ni el
+resto de `docs/`.
 
 ## Reglas innegociables de los PRDs
 
@@ -80,7 +97,7 @@ ejecútalo en orden**. No lo resumas, no lo saltes.
    entiendes el cambio. Después el cuerpo.
 4. Toda decisión que no tomó el usuario: supuesto explícito o `D-n` nueva.
 5. Actualiza el índice de `prds/README.md`. Si cambió un anexo, alinéalo.
-6. `make verify`. Pega la salida.
+6. `make verify`. Su última línea va al informe final (ver Topes).
 7. Lectura adversarial del PRD: ¿contradice algún RF vigente que no nombraste
    en `## 0.`? Si tienes subagentes, que uno fresco lea solo los PRDs y responda
    esa pregunta, sin ver tu borrador ni tu razonamiento.
@@ -116,6 +133,18 @@ toquen el repo. No se cambia por intuición; se evalúa.
 4. Promueve el cambio solo si el puntaje sube. Si el juez y tú no coinciden, el
    rubric es ambiguo: arréglalo antes de concluir nada.
 
+## Topes de longitud
+
+Son máximos, no metas. Si un texto no cabe, el problema es el alcance, no el tope.
+
+- **Decisión técnica nueva en `docs/arquitectura.md`:** máximo 50 líneas. Tres
+  líneas sobre qué la exige (RF o sección), la decisión, y una tabla de hasta
+  4 alternativas con su motivo de descarte.
+- **PRD nuevo:** apunta a 250 líneas. Si necesita más, probablemente son dos
+  decisiones y van en dos PRDs.
+- **Informe final de la sesión:** máximo 20 líneas, más la última línea de
+  `make verify` (no la salida completa).
+
 ## Convenciones
 
 - Todo en **español**, incluidos commits. Sin identificadores de modelo en
@@ -128,6 +157,7 @@ toquen el repo. No se cambia por intuición; se evalúa.
 
 ## Al terminar
 
-Reporta en este orden: qué cambió (archivos), salida de `make verify`, qué
-supuestos tomaste y dónde quedaron escritos, qué queda abierto. Si algo quedó
-sin hacer, dilo. Un "listo" sin la salida del verificador no es un listo.
+Reporta en este orden, en máximo 20 líneas: qué cambió (archivos), qué supuestos
+tomaste y dónde quedaron escritos, qué queda abierto, y la última línea de
+`make verify`. Si algo quedó sin hacer, dilo. Un "listo" sin la línea final del
+verificador no es un listo.
