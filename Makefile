@@ -64,7 +64,9 @@ migrar: instalar
 # Carga inicial del local piloto (F1-05). Tampoco es parte de `verify`, por lo
 # mismo que `migrar`: lo que `verify` revisa del cargador son sus pruebas.
 # ARCHIVO es opcional; sin él se usa el ejemplo versionado del repositorio.
-# COMANDO es validar (por defecto), plan o cargar.
+# COMANDO es validar (por defecto), plan o cargar. `validar` no necesita base de
+# datos; `plan` la lee y `cargar` la escribe, las dos con las migraciones ya
+# aplicadas (ver packages/carga-inicial/README.md).
 cargar-piloto: instalar
 	@node packages/carga-inicial/src/cli.ts $(or $(COMANDO),validar) $(ARCHIVO)
 

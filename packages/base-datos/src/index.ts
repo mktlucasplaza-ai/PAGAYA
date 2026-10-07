@@ -14,6 +14,8 @@
 export { crearAcceso } from "./acceso.ts";
 export type { Acceso, Fila, Mirada, OpcionesAcceso, Transaccion } from "./acceso.ts";
 
+export { migrarAmbiente } from "./postgres.ts";
+
 export {
   aplicarMigraciones,
   directorioMigraciones,

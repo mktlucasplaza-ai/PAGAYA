@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 (§9, la identidad, y §10, el aislamiento por local, agregadas el 2026-10-06) |
+| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -350,6 +350,10 @@ cuenta como visita. Las dos dicen qué las reabriría como PRD.
 | S-13 | **Una mesa tiene a lo más un mesero por turno**, y el cargador rechaza el archivo que diga otra cosa (§11.1). | PRD-001 §9 manda cada aviso "al mesero de la mesa", en singular, y escala al administrador cuando *no hay* asignación; RF-A-04 asigna mesas a meseros. Nadie lo escribió como regla. Si el local necesita mesas compartidas entre dos meseros, es un PRD nuevo: hay que definir quién recibe RF-M-02 y RF-M-03 y quién responde. |
 | S-14 | **El token del QR se deriva de (local, número de mesa)** cuando el archivo no lo declara (§11.1). | Si el cargador lo sorteara, la segunda corrida cambiaría el QR impreso de todas las mesas. Que sea derivable no lo debilita: el QR identifica y no autentica (PRD-003 §3.1), y el control de "estoy sentado acá" es el PIN (PRD-002 §3.1). Un local que prefiera un token opaco —o que vaya a renumerar mesas— lo declara en el archivo. |
 | S-15 | **El cargador no borra nada**: lo que el archivo ya no nombra se reporta como huérfano, salvo las asignaciones de los turnos que el archivo declara (§11.2). | PRD-001 §12: los ítems de comandas viejas referencian al producto y guardan el precio del momento. Borrar en una carga rutinaria es irreversible y silencioso. Si hay que retirar un producto de verdad, lo hará el panel de la Fase 4 (RF-A-01) con su auditoría. |
+| S-16 | **`local.slug` es la clave natural del archivo de carga y es opcional** (§12.1). | Ningún PRD la nombra, porque ningún PRD habla del archivo de carga, y sin ella la segunda corrida no sabe cuál de los locales es el del archivo: la idempotencia de F1-05 no se podría calcular. Es opcional porque es un dato del archivo y no del local —la identidad del local es su `id`—, y hacerla obligatoria forzaría a inventarle un nombre corto a todo local que nazca por otro camino, incluido el panel de RF-A-09. Si algún día el slug sale en una URL o en un reporte, pasa a obligatorio con una migración y un valor derivado del nombre. |
+| S-17 | **`local.moneda` es una columna con `CHECK (moneda = 'CLP')`** (§12.1). | PRD-002 §1 decidió Chile y el contrato del archivo ya declara la moneda "para que el día que haya otro mercado falle acá"; ningún PRD pide guardarla. Se guarda por dos motivos: el plan la compara en cada corrida —si no estuviera, el cargador querría actualizar el local para siempre— y así el que escriba sin pasar por el archivo, como el panel de RF-A-09, falla igual. El día que haya un segundo mercado, lo que cambia es el `CHECK`, y cambiarlo obliga a revisar que los precios enteros sigan teniendo sentido (PRD-002 §1). |
+| S-18 | **El personal lleva `codigo` obligatorio y el cliente nunca** (§12.1). | Es la clave natural con la que el archivo nombra a cada mesero (RF-A-03), y hacerla obligatoria en el personal es lo que evita que el cargador tenga que ignorar en silencio a un mesero que no puede nombrar. El costo es que el panel de la Fase 4 tendrá que asignar un código al dar de alta a alguien; es una línea del formulario. Si eso resultara molesto, el código pasa a opcional y el cargador reporta como huérfano al personal sin código, que es peor: un huérfano que nadie puede resolver. |
+| S-19 | **`mesa.qr_token` es único en todo el sistema, no por local** (§12.1). | Lo que el cliente escanea tiene que resolver a una sola mesa de un solo local (RF-C-01, F1-11), y un token que solo fuera único dentro del local obligaría a que el QR llevara también el local y a confiar en que los dos coincidan. No debilita nada: el token identifica y no autentica (PRD-003 §3.1), y el control de "estoy sentado acá" es el PIN (PRD-002 §3.1). Se paga con una restricción que cruza locales: dar de alta un local puede fallar por un token de otro, que con el token derivado de (local, mesa) de S-14 solo ocurre si dos locales comparten slug, y el slug es único. |
 
 ---
 
@@ -1170,6 +1174,8 @@ cambios —`crear`, `actualizar`, `baja`— que recién entonces se aplica.
   Hasta entonces el comando `cargar` **falla diciéndolo**, con el código
   `no_implementado`, y `plan` muestra qué escribiría. Un cargador que cargara en
   memoria y dijera que terminó sería un auto-reporte.
+  **Ya hecho:** §12 (AT-18 escribe esas tablas y AT-19 el adaptador); `cargar`
+  carga y `plan` lee el estado real.
 
 | Alternativa | Motivo del descarte |
 |---|---|
@@ -1197,3 +1203,247 @@ cambios —`crear`, `actualizar`, `baja`— que recién entonces se aplica.
 El ejemplo del repositorio es un local **ficticio** y se revisa como tal: una
 prueba verifica que todos sus teléfonos estén en un rango que no se asigna en
 Chile, para que nadie suba el número de alguien real junto con la carta.
+
+## 12. El catálogo, las mesas y el personal (F1-06)
+
+Las ocho tablas que el archivo de carga escribe y que el resto de la Fase 1 lee.
+Las exige **F1-06** del [backlog](backlog-fase-1.md) ("Migración 0003 con las
+tablas que el archivo de carga escribe y que F1-10 y F1-30 leen", PRD-001 §12),
+que depende de **F1-02** —el aislamiento y la capa de acceso— y de **F1-05** —el
+contrato del archivo y el plan—. Son las tablas de RF-A-01 a RF-A-04, los
+requisitos del panel que llega en la Fase 4 y que F1-05 sustituye por ahora.
+
+§7 dejó el "esquema de datos completo" fuera de las cuatro decisiones de arriba
+y esta sección **no lo completa**: escribe lo que el cargador nombra y nada más.
+La sesión de mesa, el PIN, la comanda, el pago y la visita siguen naciendo con
+las tareas que las usan (§12.3).
+
+Y es la tarea que vuelve falsa —a propósito— la última frase de AT-17: *"hasta
+entonces el comando `cargar` falla diciéndolo, con el código
+`no_implementado`"*. Ya no falla, y lo que lo demuestra no es esta sección sino
+una prueba de integración que carga el archivo dos veces contra PostgreSQL.
+
+```
+AT-18 Esquema ──── la clave natural es del archivo, el id es de la base, y la
+                   base solo revisa lo que ningún camino puede violar
+AT-19 Adaptador ── el puerto de AT-17 sobre la capa de AT-13: una transacción
+                   entre locales, y la idempotencia verificada contra PostgreSQL
+```
+
+### 12.1 AT-18 — La clave natural es del archivo, el id es de la base
+
+**Qué lo exige.** PRD-001 §12 define las entidades —Usuario, Mesa, Asignación de
+mesas, Producto— y AT-16 definió el contrato del archivo que las carga:
+categorías, productos con precio y variantes (RF-A-01), mesas y zonas con su QR
+(RF-A-02), usuarios del local (RF-A-03) y asignaciones por turno (RF-A-04). De
+estas tablas leen F1-30 (la carta, RF-C-03), F1-10 (la mesa) y F1-60 (las mesas
+del mesero, RF-M-01). Lo escribe la migración `0003_catalogo_mesas_y_personal.sql`,
+inmutable como todas (AT-7).
+
+**Decisión.** Ocho tablas —`usuario`, `zona`, `mesa`, `categoria`, `producto`,
+`variante`, `turno`, `asignacion`— más dos columnas en `local`. Y cuatro reglas
+que valen para todas:
+
+- **Cada entidad tiene su clave natural única *dentro del local*** —el slug de
+  la zona, el sku del producto, el número de la mesa, el código del mesero,
+  `(turno, mesa)` para la asignación— y además su `id` uuid. El archivo no
+  inventa identificadores (AT-17) y la base no depende de los nombres del
+  archivo: `UNIQUE (local_id, <clave natural>)` es lo que une las dos cosas.
+- **Una fila no puede apuntar a un padre de otro local.** Cada tabla lleva
+  `UNIQUE (local_id, id)` y quien la referencia usa una clave ajena **compuesta**
+  `(local_id, <padre>_id)`. La row level security no alcanza acá: `entreLocales`
+  la apaga (AT-13) y es justo el camino por el que entra la carga, así que sin
+  esto una asignación podría unir el turno de un local con la mesa de otro.
+- **La base revisa lo que ningún camino de escritura puede violar; el archivo
+  revisa su contrato.** En la base: identidad (`usuario`), dinero (`precio`
+  entero, `moneda`), referencias, unicidad de las claves naturales y la
+  cardinalidad de la asignación. En `validacion.ts`: rangos, la forma canónica de
+  la zona horaria, el teléfono móvil chileno, que una variante no deje el precio
+  bajo cero. Repetir en la base las del archivo no las haría más ciertas, y haría
+  que cambiar el largo máximo de un nombre de producto pidiera una migración.
+- **`local_id` encabeza todo índice** (§10.1, consecuencias). Los dos que no
+  salen de una restricción son los que la operación va a consultar:
+  `producto (local_id, categoria_id, orden)` para pintar la carta y
+  `asignacion (local_id, mesero_id, turno_id)` para "mis mesas en este turno".
+
+Lo que cada tabla decide por su cuenta:
+
+- **`usuario` es la excepción al `local_id`, y ya estaba escrita.** §9.3 la
+  decidió en F1-03 y la migración 0002 la dejó anotada en el comentario de
+  `pagaya.tabla_sin_local`: `local_id` **nulo para el cliente y obligatorio para
+  el personal**, porque PRD-001 §12 da el "local al que pertenece" solo a meseros
+  y administradores y PRD-004 §3 hace de una cuenta de cliente una persona. Esta
+  migración cumple las dos obligaciones que §10.1 le fijó: su política está
+  escrita a mano —`entre_locales()`, o `local_id IS NULL`, o
+  `local_id = local_actual()`— y su fila está en `pagaya.tabla_sin_local` con el
+  motivo. La equivalencia `(rol = 'cliente') = (local_id IS NULL)` es un `CHECK`:
+  ni un cliente con local ni un mesero sin él.
+- **El teléfono es único en todo el sistema**, no por local (PRD-004 §3 y §8:
+  "una cuenta por número de teléfono. Cierra el farmeo de niveles con cuentas
+  múltiples"). El email no existe todavía: PRD-004 §3 lo deja "opcional y
+  posterior, ofrecido desde el perfil, nunca en el registro".
+- **Un cliente no se convierte en personal del local, ni al revés.** Es un
+  disparador y no un `CHECK` porque mira la fila anterior. Lo exige la rama
+  `local_id IS NULL` de la política: una transacción fijada en un local **tiene**
+  que ver las filas de cliente —son de quien no pertenece a ningún local— y sin
+  esta regla podría ascender una a mesero suyo con un `UPDATE`, que es acceso a
+  las comandas de sus mesas (S-9). §9.4 ya había decidido el fondo: "un titular
+  tiene un rol", y si el piloto encuentra el caso, "se cierra con un PRD, no con
+  un campo". Pasar de mesero a administrador sigue permitido: eso es RF-A-03.
+- **`UNIQUE (local_id, turno_id, mesa_id)` en `asignacion` es el supuesto S-13
+  escrito en el esquema.** Una mesa tiene a lo más un mesero por turno porque
+  PRD-001 §9 manda cada aviso "al mesero de la mesa", en singular, y escala al
+  administrador cuando *no hay* asignación (F1-73). Hasta ahora eso solo lo
+  revisaba el validador del archivo; ahora no se puede violar por ningún camino.
+- **El estado de la mesa y la disponibilidad del producto son operación, no
+  configuración.** `mesa.estado` (PRD-001 §15) no está: lo agrega F1-10, que es
+  la tarea que tiene su máquina de estados, y si el cargador lo escribiera una
+  segunda corrida liberaría una mesa ocupada (§11.3). `producto.disponible` sí
+  está, con su valor inicial, porque RF-M-12 lo mueve durante el servicio y
+  AT-17 ya decidió que el cargador solo lo escriba al crear.
+- **`orden` no lleva unicidad en la base** aunque el archivo sí la exija entre
+  las categorías: reordenar dos es intercambiar sus posiciones, y un `UNIQUE` no
+  diferido rechazaría el estado intermedio de esa misma transacción.
+- **El turno guarda `time` del reloj del local**, no instantes: un turno es
+  "19:00 a 01:00" todos los días. `fin` menor que `inicio` significa que cruza
+  medianoche —el caso normal de la cena—, así que lo único que no puede ser es
+  que empiece y termine a la misma hora. Convertir esas horas a un instante es
+  trabajo de `pagaya.fecha_local` (AT-15), no de `::date`.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Crear estas tablas en F1-05, con el cargador | Lo descartó AT-17 por escrito: sería decidir el modelo de datos de la carta y de la mesa desde una herramienta de carga, con una migración inmutable escrita de paso. Lo que cambió no es el argumento, es que ahora hay una tarea cuyo trabajo es justamente este. |
+| Crear de una vez todo PRD-001 §12 —comanda, ítem, pago, visita, feedback— | Es la misma trampa un nivel más arriba. La comanda necesita `comanda.version` (AT-3) y el pago su índice único parcial y su `CHECK` del descuento (AT-4): esas restricciones son el corazón de F1-40 y de la Fase 2, y escribirlas desde acá las deja sin la prueba que las verifica. Una migración inmutable con una invariante a medias es peor que no tenerla. |
+| Usar la clave natural como clave primaria, sin uuid | Cambiar el sku de un producto o el número de una mesa pasaría a reescribir en cascada todo lo que lo referencia, incluidos los ítems de comandas viejas (PRD-001 §12). Y RF-A-02 deja renumerar mesas. La clave natural identifica para el archivo; el id identifica para la base. |
+| Una clave ajena simple a `zona(id)` en lugar de la compuesta con `local_id` | Más corta y deja pasar exactamente el error que importa: una mesa del local A en la zona del local B. Se paga con un `UNIQUE (local_id, id)` por tabla, que es un índice que de todos modos empieza por `local_id`. |
+| Forzar en la base que el asignado sea `rol = 'mesero'` y no administrador | Se puede —una columna generada constante y una clave ajena a `usuario (local_id, rol, id)`— y el precio no vale la pena: bloquearía el cambio de rol de RF-A-03 mientras el mesero tenga mesas, y lo que evita es una fila sin sentido pero inofensiva. La clave ajena compuesta ya garantiza lo que importa: **personal de este local**, porque `usuario.local_id` solo es no nulo en el personal. Que sea mesero lo revisa el archivo. |
+| `moneda` y el `slug` del local como claves de `local.configuracion` | AT-14 fija la regla y acá se aplica al revés: `moneda` sostiene una invariante de dinero y `slug` es una clave única que la base tiene que poder exigir. Ninguna de las dos es algo que el administrador cambie sin desplegar. |
+| Repetir en la base los rangos del validador (capacidad 1 a 40, teléfono `+569`, zona IANA canónica) | Son el contrato del archivo, no del esquema. Puestos en la base, el mensaje de error deja de decir en qué línea del archivo está el problema, y el día que el local piloto tenga una mesa de 50 personas hay que escribir una migración. |
+
+**Consecuencias.**
+
+- **Una persona no puede ser mesero en dos locales**, porque su teléfono es único
+  y su `local_id` obligatorio. No es una decisión de esta tarea: sale de PRD-001
+  §12 y PRD-004 §3 juntos, igual que §9.4 ya había notado que hoy nadie puede ser
+  mesero y cliente a la vez. Si el piloto lo encuentra, es un PRD.
+- **La política de `usuario` deja ver las cuentas de cliente desde cualquier
+  local.** Es lo que §9.3 pide y lo que hace posible autenticar a quien no
+  pertenece a ningún local. Lo que no responde es qué columnas puede ver quién:
+  que el mesero vea solo el nombre de pila y nunca los datos de contacto es
+  **F1-64** (PRD-001 §14), en la capa de la consulta.
+- **Sin local fijado solo se ven las cuentas de cliente**, porque para el
+  personal `local_id = NULL` no es verdadero. El `porHuellaDeToken` de §9.3 —la
+  única búsqueda que no filtra por local— va a tener que resolverse contra la
+  tabla de sesiones, no contra ésta; es un dato para la tarea que la cree (§9.4),
+  y queda dicho en la prueba que lo comprueba.
+- **La migración 0003 agrega una columna `NOT NULL` con valor por defecto a una
+  tabla que ya existía** (`local.moneda`) y una opcional (`local.slug`). Ninguna
+  de las dos reescribe la tabla ni toca datos, así que no necesita encender
+  `pagaya.entre_locales` —lo que sí necesitaría una migración que escribiera
+  filas de negocio (§10.1, consecuencias).
+
+### 12.2 AT-19 — El repositorio del cargador, y la idempotencia como prueba
+
+**Qué lo exige.** AT-17 dejó la escritura detrás del puerto `RepositorioCarga` y
+dijo qué faltaba para implementarlo: "no la capa de acceso […] sino las tablas de
+la carta, las zonas, las mesas, el personal, los turnos y las asignaciones". Con
+AT-18 ya están.
+
+**Decisión.** `repositorioPostgres(acceso)` implementa el puerto sobre la capa
+única de AT-13, y el cargador en memoria vuelve a ser lo único que siempre tuvo
+que ser: el doble con el que se prueban la planificación y la idempotencia sin
+PostgreSQL.
+
+- **Entra por `entreLocales`, con motivo escrito.** Es la entrada que AT-13 dejó
+  nombrada para esto: dar de alta un local no puede filtrar por un `local_id` que
+  todavía no existe, y el resto de la carga escribe sobre un local que recién se
+  creó en la misma corrida. Hay dos motivos distintos, uno para leer el estado y
+  otro para escribir el plan, y los dos nombran a F1-05: el día que exista el
+  registro de auditoría (F1-04) va a leerse ahí.
+- **Todo el plan va en una transacción**, que es lo que AT-17 pide y que acá sale
+  gratis: la capa de acceso no tiene consulta fuera de una transacción. Un
+  archivo cargado a medias no existe.
+- **Un solo mapa entre el contrato y el esquema.** Cada entidad declara su tabla,
+  las partes de su clave natural, el campo → columna de cada dato y su consulta
+  de lectura, en un único lugar. La alternativa —escribir la lectura y la
+  escritura por separado— deja que las dos discrepen en silencio, y la forma en
+  que eso se manifiesta es la peor posible: un plan que siempre quiere actualizar
+  algo y una carga que nunca converge.
+- **Las referencias se resuelven con el orden del plan.** `ORDEN_ENTIDADES` ya es
+  parte del contrato del puerto (AT-17): la zona antes que la mesa, la categoría
+  antes que su producto. El adaptador traduce la clave natural al `id` que generó
+  la base, con una caché por corrida, y si una referencia no está, falla diciendo
+  qué entidad y qué clave faltaba en lugar de escribir un nulo.
+- **El adaptador no borra nada que no sea una asignación.** El plan solo produce
+  bajas de asignación (AT-17, supuesto S-15), y el adaptador lo exige en lugar de
+  suponerlo: una baja de producto o de mesa falla con su motivo. Es la misma
+  regla de siempre —un producto retirado sigue referenciado por los ítems de
+  comandas viejas (PRD-001 §12)— puesta donde ya no se puede saltar.
+- **El comando `plan` deja de mentir.** Antes planificaba contra un local vacío
+  en memoria, porque no había de dónde leer el estado; ahora lee el estado real y
+  no escribe nada. `validar` sigue sin necesitar base de datos, que es lo que
+  permite correrlo recién clonado el repositorio.
+- **La idempotencia se verifica contra PostgreSQL, no solo contra el doble.** La
+  prueba carga el archivo, vuelve a leerlo y compara campo por campo contra lo
+  que el archivo declara; después lo carga otra vez y exige cero cambios y las
+  mismas filas. Es la única forma de ver un `time` que vuelve como `'19:00:00'`
+  donde el archivo dice `'19:00'`: el doble en memoria devuelve lo que guardó, y
+  por eso no puede detectar nada de esto.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Que el adaptador use `conLocal` y el alta del local se haga aparte | Partiría la carga en dos transacciones: el local en una, su contenido en otra. Un fallo en la segunda deja un local vacío que la corrida siguiente no distingue de uno a medio cargar, y es exactamente lo que AT-17 prohíbe. |
+| `INSERT … ON CONFLICT DO UPDATE` sobre la clave natural, sin plan | Ya lo descartó AT-17 por tres motivos que siguen en pie, y uno se nota recién acá: pisaría `disponible` en cada corrida, que es lo que RF-M-12 no tolera. Y seguiría sin poder mostrar nada antes de correrlo. |
+| Generar el SQL desde el contrato en tiempo de ejecución, por reflexión sobre el esquema | Suena a menos código y es más: habría que consultar el catálogo de PostgreSQL para saber qué columnas existen, y el error de un campo mal mapeado aparecería en tiempo de ejecución en lugar de en `tsc`. El mapa explícito cabe en una pantalla y se lee. |
+| Dejar la prueba de integración solo con "cargar dos veces no cambia nada" | Pasa igual con una lectura que devuelva basura consistente. Lo que la hace valer es comparar contra lo que **el archivo** dice, que es el único lado de la igualdad que no sale de la base. |
+| Probar el aislamiento entre locales con un simulacro | Lo que se está probando es que PostgreSQL rechaza lo que el código podría dejar pasar: la política de la migración 0002 y las claves ajenas compuestas de AT-18. Un simulacro probaría el simulacro. |
+
+**Consecuencias.**
+
+- `make cargar-piloto` con `plan` o `cargar` necesita `PAGAYA_AMBIENTE` y la base
+  del ambiente; `validar` no. Es la misma frontera que `make migrar`: verificar y
+  validar no escriben en ninguna base, y lo que escribe es un paso explícito.
+- `@pagaya/carga-inicial` gana dos aristas en `fronteras.json`: a
+  `@pagaya/base-datos`, por el adaptador, y a `@pagaya/config`, porque como
+  `apps/api` y `apps/repartidor` es un proceso que carga su propio ambiente para
+  saber a qué base le habla. Sigue sin importar ningún módulo de dominio.
+- `@pagaya/base-datos` gana una exportación, `migrarAmbiente(config)`: aplicar
+  las migraciones con su pool y su cerrojo era un baile que `cli.ts` y las
+  pruebas de integración repetían, y ahora que hay pruebas de integración en dos
+  paquetes hacía falta una sola forma de pedir el esquema. El pool sigue sin
+  salir del paquete (AT-13).
+- Las pruebas de integración corren en procesos separados y en paralelo contra la
+  misma base, así que cada archivo migra por su cuenta —el cerrojo de asesoría de
+  AT-7 las serializa—, usa sus propios locales y los borra al terminar. Los
+  teléfonos tienen que ser distintos entre archivos de prueba, porque el
+  teléfono es único en todo el sistema (AT-18): es incómodo una vez y es la
+  invariante de PRD-004 §3 funcionando.
+
+### 12.3 Lo que F1-06 no crea, y por qué
+
+- **La sesión de mesa, el PIN y el estado de la mesa** (F1-10, F1-12, F1-15). El
+  PIN no es configuración de la mesa sino de su sesión, y rota al abrirse y
+  cerrarse (PRD-002 §3.1 y §3.4); el estado es operación (PRD-001 §15). Ya lo
+  decía §11.3: un PIN cargado por script sería un PIN que no rota.
+- **La comanda, sus ítems y sus participantes, y todo el pago** (F1-40 en
+  adelante y la Fase 2). Sus restricciones son las que AT-3 y AT-4 describen
+  —`comanda.version`, el índice único parcial del cobro, el `CHECK` del
+  descuento— y nacen con la tarea que las prueba.
+- **La tabla de sesiones**, que §9.4 dejó pedida contra el puerto
+  `RepositorioSesiones`. No la escribe el cargador y no la lee F1-30, así que no
+  es de esta tarea; lo que esta tarea le deja es un dato: con la política de
+  `usuario`, una búsqueda sin local fijado no encuentra al personal, así que la
+  sesión va a tener que llevar lo que `porHuellaDeToken` necesita (§9.3).
+- **Lo que PRD-004 §8 agrega al usuario y no escribe el cargador**:
+  `estado_verificacion` y la tabla de verificación del OTP (F1-20), el
+  `consentimiento` con su versión (F1-22, bloqueado por G-4) y
+  `eliminacion_solicitada_en` (RF-C-23, sin fase asignada hasta que haya visitas
+  y pagos que anonimizar). Están nombrados en el PRD y van a ser columnas de
+  `usuario`; las agrega la tarea que las llena, por lo mismo que `local` sigue
+  sin RUT ni dirección (AT-14): una columna que nadie llena llega al día en que
+  se usa llena de nulos y de suposiciones.
+- **El registro de auditoría** (F1-04). El motivo de cada `entreLocales` del
+  cargador ya está escrito y hoy no va a ningún lado, igual que en AT-13.
+- **Los niveles, las propinas, los medios de pago y los datos de boleta**
+  (RF-A-07, RF-A-09, RF-A-18): son de las fases 2 y 3, el archivo no los nombra
+  (§11.3) y `local.configuracion` los espera sin una columna por PRD (AT-14).

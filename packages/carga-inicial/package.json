@@ -3,11 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Carga inicial del local piloto (F1-05): valida el archivo del local y calcula el plan de escritura.",
+  "description": "Carga inicial del local piloto (F1-05): valida el archivo del local, calcula el plan de escritura y lo aplica sobre PostgreSQL (F1-06).",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@pagaya/nucleo": "*"
+    "@pagaya/nucleo": "*",
+    "@pagaya/config": "*",
+    "@pagaya/base-datos": "*"
   }
 }

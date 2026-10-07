@@ -7,26 +7,18 @@
 import { cargarConfiguracion } from "@pagaya/config";
 import { ErrorPagaya } from "@pagaya/nucleo";
 
-import { aplicarMigraciones, listarMigraciones } from "./migraciones.ts";
-import { crearPool, liberarCerrojoMigraciones, registroPostgres } from "./postgres.ts";
+import { listarMigraciones } from "./migraciones.ts";
+import { migrarAmbiente } from "./postgres.ts";
 
 async function migrar(): Promise<void> {
   const config = cargarConfiguracion();
   const migraciones = listarMigraciones();
   console.log(`ambiente ${config.ambiente}: ${migraciones.length} migración(es) en el repositorio`);
 
-  const pool = crearPool(config);
-  const cliente = await pool.connect();
-  try {
-    const informe = await aplicarMigraciones(registroPostgres(cliente), migraciones);
-    for (const nombre of informe.yaEstaban) console.log(`  ya estaba  ${nombre}`);
-    for (const nombre of informe.aplicadas) console.log(`  aplicada   ${nombre}`);
-    if (informe.aplicadas.length === 0) console.log("nada que aplicar");
-  } finally {
-    await liberarCerrojoMigraciones(cliente).catch(() => undefined);
-    cliente.release();
-    await pool.end();
-  }
+  const informe = await migrarAmbiente(config);
+  for (const nombre of informe.yaEstaban) console.log(`  ya estaba  ${nombre}`);
+  for (const nombre of informe.aplicadas) console.log(`  aplicada   ${nombre}`);
+  if (informe.aplicadas.length === 0) console.log("nada que aplicar");
 }
 
 const comando = process.argv[2];

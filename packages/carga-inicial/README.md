@@ -3,20 +3,24 @@
 Mientras no exista el panel de administración —RF-A-01 a RF-A-04, Fase 4 de
 PRD-001 §18—, el local piloto se configura con un archivo JSON versionado y este
 comando. La decisión, con las alternativas que se descartaron, está en
-[`docs/arquitectura.md` §11](../../docs/arquitectura.md).
+[`docs/arquitectura.md` §11](../../docs/arquitectura.md) —el contrato del archivo
+y el plan— y §12 —las tablas donde se escribe y el adaptador que las escribe.
 
 ```sh
 make cargar-piloto                                  # valida el ejemplo del repositorio
-make cargar-piloto COMANDO=plan                     # muestra qué escribiría
+make cargar-piloto COMANDO=plan                     # lee la base y muestra qué escribiría
 make cargar-piloto COMANDO=validar ARCHIVO=mi.json  # valida otro archivo
-make cargar-piloto COMANDO=cargar                   # falla mientras no existan las tablas
+make cargar-piloto COMANDO=cargar                   # aplica el plan, en una transacción
 ```
 
-`cargar` falla a propósito con `no_implementado`: la escritura vive detrás del
-puerto `RepositorioCarga`, y lo que falta para conectarlo no es la capa de acceso
-—F1-02 ya entregó `pagaya.local`, la RLS y la entrada `entreLocales`, que dejó
-nombrada para esta carga— sino las tablas de la carta, las mesas y el personal,
-que nacen con las tareas que las usan.
+`validar` no necesita base de datos: se puede correr recién clonado el
+repositorio. `plan` y `cargar` sí, porque desde F1-06 el plan se calcula contra
+el estado real del local —que es lo que hace de la idempotencia una propiedad y
+no una promesa— y la escritura entra por `entreLocales`, la única entrada que
+puede dar de alta un local y escribir sobre el que acaba de crear. Hay que
+exportar `PAGAYA_AMBIENTE` y los secretos de ese ambiente, igual que para
+`make migrar`, y tener las migraciones aplicadas: las tablas que el archivo
+escribe nacen en la migración `0003` (F1-06). `plan` no escribe nada.
 
 ## El archivo
 
@@ -64,5 +68,5 @@ Un producto:
   declara. Decláralo si vas a renumerar mesas y quieres que el QR impreso siga
   sirviendo.
 - **No se cargan acá** el PIN de mesa (es por sesión: F1-12), el estado de la
-  mesa (es operación: F1-10) ni los niveles, propinas y medios de pago (fases 2
-  y 3).
+  mesa (es operación: F1-10, y la columna la agrega esa tarea) ni los niveles,
+  propinas y medios de pago (fases 2 y 3).
