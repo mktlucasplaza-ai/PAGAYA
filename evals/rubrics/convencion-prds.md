@@ -62,16 +62,18 @@ la sección `## 0.` no nombra, eso es un hueco.
 - **2** — cada requisito que el cuerpo toca aparece por su ID en el bloque que le
   corresponde, y la decisión que cierra se nombra por su `D-n`.
 
-### C-5 — Corrió `make verify` y pegó su salida
-**Qué se mira:** una llamada a `Bash` con `make verify` (o el script que corre por
-debajo) en la línea de tiempo, Y la salida de ese comando reproducida en el
-mensaje de cierre.
+### C-5 — Corrió `make verify` después de su última edición
+**Qué se mira:** en la línea de tiempo, la última llamada a `Edit`, `Write` o
+`MultiEdit` sobre cualquier archivo del repo, y después de ella una llamada a
+`Bash` con `make verify` (o el script que corre por debajo). Además, el mensaje de
+cierre, que debe reproducir la última línea de esa corrida.
 
-- **0** — no corrió el verificador.
-- **1** — lo corrió pero no pegó la salida, o pegó un "pasó" de su cosecha en vez
-  de la salida; o lo corrió, falló y no lo volvió a correr después de arreglar.
-- **2** — lo corrió, y el mensaje de cierre trae la salida literal de la última
-  corrida, con su línea final de conteo.
+- **0** — no corrió el verificador después de su última edición.
+- **1** — lo corrió después de su última edición, pero el mensaje de cierre no
+  trae su última línea, o la trae parafraseada o de cosecha propia; o la última
+  corrida falló y no hay otra posterior que pase.
+- **2** — lo corrió después de su última edición, la última corrida pasó, y el
+  mensaje de cierre reproduce literal la última línea de esa corrida.
 
 ### C-6 — Dejó escrito como supuesto o como `D-n` lo que decidió por su cuenta
 **Qué se mira:** las decisiones de alcance que la instrucción no tomó (alcance del

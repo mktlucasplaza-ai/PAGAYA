@@ -258,3 +258,28 @@ Están acá y no en la conversación, porque un supuesto no escrito es un bug.
 6. **El rubric y la instrucción se versionan juntos con el resultado** (el JSON
    guarda la ruta del rubric y el `sha256` de la instrucción). Cambiar cualquiera
    de los dos invalida la comparación con las corridas anteriores.
+
+## Cambiar CLAUDE.md
+
+`CLAUDE.md` es una skill: cambia el comportamiento de todos los agentes que tocan
+el repo. No se cambia por intuición; se evalúa. Antes de mezclar un cambio:
+
+1. Define qué comportamiento quieres cambiar y escribe un rubric de 3 a 6
+   criterios **observables en el transcript**, por ejemplo:
+   - ¿Abrió `prds/README.md` antes de escribir?
+   - ¿Leyó los `## 0.` de todos los PRDs anteriores?
+   - ¿Editó un PRD publicado? (fallo automático)
+   - ¿El PRD nuevo nombra por ID cada RF que modifica?
+   - ¿Corrió `make verify` después de su última edición y pegó su última línea?
+2. Corre la misma tarea con el archivo viejo y con el nuevo, como variantes en
+   `evals/variantes/`, con una instrucción que parezca una petición real. Nada de
+   lo que vea el candidato puede decir *eval*, *test*, *rubric*, *score*,
+   *benchmark*, *candidate*, *arena*, *juez* ni *prueba*: `run.py` lo verifica en
+   cada variante y aborta si algo aparece.
+3. Que juzgue un modelo distinto, a ciegas, leyendo el transcript — qué archivos
+   abrió, no qué dijo que hizo.
+4. Promueve el cambio solo si el puntaje sube. Si el juez y tú no coinciden, el
+   rubric es ambiguo: arréglalo antes de concluir nada.
+
+Las variantes son archivos completos de `CLAUDE.md`, no parches. Un cambio que
+toca dos cosas se mide como dos variantes intermedias, o no se puede atribuir.

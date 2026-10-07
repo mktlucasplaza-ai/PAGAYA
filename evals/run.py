@@ -699,18 +699,15 @@ def main() -> int:
         gitdir = (RAIZ / gitdir).resolve()
 
     # plan — nada de lo que el candidato va a ver puede delatar la corrida.
+    # Para "actual" el archivo que ve el candidato es el de la base.
+    base_archivo = git("show", f"{sha}:{args.archivo_variante}", cwd=RAIZ, check=False)
     fuentes_duras = {str(ruta_instr.relative_to(RAIZ)): instruccion}
     for etiqueta, ruta in args.variante:
         fuentes_duras[f"variante {etiqueta}"] = (
-            ruta.read_text(encoding="utf-8") if ruta else "")
+            ruta.read_text(encoding="utf-8") if ruta else base_archivo)
     revisar_palabras(fuentes_duras, duro=True)
-    base_archivo = git("show", f"{sha}:{args.archivo_variante}", cwd=RAIZ, check=False)
-    advertencias = [
-        f"ya venía en el repo: {h}"
-        for h in revisar_palabras({args.archivo_variante: base_archivo}, duro=False)
-    ]
-    for a in advertencias:
-        print(f"  aviso  {a}", file=sys.stderr)
+    # Con la revisión estricta no queda nada que sea solo advertencia.
+    advertencias: list[str] = []
 
     rama = f"trabajo/{slug(ruta_instr.stem)}"
     revisar_palabras({"nombre de rama": rama}, duro=True)
