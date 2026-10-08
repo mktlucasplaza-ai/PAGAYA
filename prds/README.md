@@ -34,7 +34,8 @@ Para redactar un PRD nuevo, copiar `_plantilla-prd.md`.
 | [PRD-004](PRD-004-registro-obligatorio-para-pedir.md) | Registro obligatorio para pedir | Modificado por PRD-005 | 2026-09-26 |
 | [PRD-005](PRD-005-primer-pedido-por-el-mesero.md) | El mesero también puede tomar el primer pedido | Modificado por PRD-006 | 2026-09-26 |
 | [PRD-006](PRD-006-beneficiario-del-descuento-por-presencia.md) | El descuento por nivel se aplica por presencia, no por quien paga | Modificado por PRD-007 | 2026-10-04 |
-| [PRD-007](PRD-007-fintoc-y-kushki-como-pasarelas.md) | Fintoc y Kushki como pasarelas de pago | Vigente | 2026-10-04 |
+| [PRD-007](PRD-007-fintoc-y-kushki-como-pasarelas.md) | Fintoc y Kushki como pasarelas de pago | Modificado por PRD-008 | 2026-10-04 |
+| [PRD-008](PRD-008-plataforma-fintoc-subcomercios-y-tarjeta-guardada.md) | Resultados de la reunión con Fintoc: plataforma de subcomercios, tarjeta guardada y Google Pay sin proveedor | Vigente | 2026-10-08 |
 
 ## Anexos
 

@@ -364,9 +364,13 @@ cuenta como visita. Las dos dicen qué las reabriría como PRD.
   OTP ya es configurable por exigencia de PRD-004 §3.
 - **Enrutamiento entre Fintoc y Kushki**: ya está decidido en **PRD-007 §2.1**
   (Fintoc principal, Kushki para Webpay Plus y como respaldo; MercadoPago queda
-  descartado), sobre la interfaz única de proveedor que exige PRD-002 §5.2. Su
-  habilitación depende de **G-2**, reescrita en PRD-007 §7; aquí no se agrega
-  nada. El plazo de confirmación de la transferencia y el conflicto entre un
+  descartado), sobre la interfaz única de proveedor que exige PRD-002 §5.2, y
+  acotado por **PRD-008 §2.4**: Google Pay queda sin proveedor y deshabilitado.
+  Su habilitación depende de **G-2**, reescrita en **PRD-008 §7**; aquí no se
+  agrega nada. El cobro es un *Checkout Session* alojado por el proveedor y el
+  local es un **subcomercio** (PRD-008 §2.1 y §2.2); el vencimiento de la
+  transferencia se reconoce por webhook mientras G-2 no confirme la consulta de
+  estado (PRD-008 §2.5). El plazo de confirmación de la transferencia y el conflicto entre un
   webhook tardío y el cobro manual los define PRD-007 §2.4 y RF-A-19, y se
   resuelven con el mecanismo que §5 ya describe.
 - **Boleta electrónica** (PRD-002 §5.5), **división de cuenta** y **KDS**
