@@ -10,6 +10,8 @@ dist/
 !.env.ejemplo
 # Configuración y secretos de Conductor en esta máquina.
 .conductor/settings.local.toml
+# Carpeta donde Conductor guarda lo que se adjunta o pega en cada workspace.
+.context/
 
 # Sistema operativo y editores
 .DS_Store
