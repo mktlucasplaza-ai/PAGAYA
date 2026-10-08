@@ -8,7 +8,8 @@ dist/
 .env
 .env.*
 !.env.ejemplo
-.conductor/settings.local.toml # configuración y secretos de Conductor en esta máquina
+# Configuración y secretos de Conductor en esta máquina.
+.conductor/settings.local.toml
 
 # Sistema operativo y editores
 .DS_Store
