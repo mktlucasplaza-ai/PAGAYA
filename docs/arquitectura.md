@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida` y §45 leer la carta sin sesión: agregadas el 2026-10-10) |
+| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida`, §15 el registro de auditoría y §45 leer la carta sin sesión: agregadas el 2026-10-10) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -1556,58 +1556,171 @@ cada `tipo` de evento.
 - El código del OTP viaja en el `payload` del evento, en claro. F1-70b decide
   si `evento_salida` lo cifra en reposo (PRD-001 §14) antes de entregarlo.
 
-**F1-10a** del [backlog](backlog-fase-1.md) agrega `mesa.estado` (PRD-001 §12 y
-§15) y la tabla `sesion_mesa` que PRD-002 §3.4 pide, con la invariante que
-PRD-005 §6 refuerza sobre la misma sesión: "como máximo una comanda abierta por
-mesa". Depende de **F1-02** —el aislamiento— y de la migración 0003, que ya
-dejó dicho que el estado de la mesa "es operación, lo maneja F1-10".
+## 15. El registro de auditoría (F1-04)
 
-### 13.1 AT-20 — La invariante es un índice parcial sobre `comanda`, no una columna de `mesa`
+**F1-04** del [backlog](backlog-fase-1.md) escribe la línea de PRD-001 §14 que
+todo el resto de la Fase 1 da por hecha: *"toda anulación, corrección y pago
+queda registrada con actor y timestamp"*. Depende de **F1-02** —sin aislamiento
+por local, una auditoría es la de cualquiera— y agrega la migración **0005**.
 
-**Qué lo exige.** PRD-005 §6, literal: "se refuerza la invariante: como máximo
-una comanda abierta por mesa". `mesa.estado` es la lectura operativa de ese
-hecho, no la fuente: una columna se desincroniza si algo la actualiza a medias,
-un índice único no puede.
+Son tres decisiones, y la tercera no es de auditoría sino algo que esta tarea
+fue la primera en necesitar:
 
-**Decisión.** `pagaya.comanda` nace mínima —`id`, `local_id`, `mesa_id`,
-`estado`— y un índice único parcial, `UNIQUE (local_id, mesa_id) WHERE estado =
-'abierta'`, es la invariante completa: dos transacciones que intenten abrir la
-segunda comanda de la misma mesa a la vez no pueden ganar las dos, sin
-`SELECT … FOR UPDATE` ni un candado aparte. `sesion_mesa` vincula mesa y
-comanda (PRD-002 §3.4) y es de a una por comanda, pero no repite el candado:
-mientras exista como máximo una comanda abierta por mesa, no puede haber dos
-sesiones abiertas vinculadas a comandas de esa misma mesa.
+```
+AT-30 La tabla ──── append-only como permiso y como disparador
+AT-31 El puerto ─── `registrar` recibe la transacción, no el acceso
+AT-32 El ambiente ─ quién puede escribir una prueba contra PostgreSQL
+```
+
+### 15.1 AT-30 — Append-only es un permiso que no se otorga y un disparador que un superusuario no esquiva
+
+**Qué lo exige.** PRD-001 §14 (actor y marca de tiempo), RF-A-10 (el historial
+de correcciones y anulaciones), RF-A-15 mod. por PRD-006 §2 (vía de ingreso,
+beneficiario y pagador, *"para auditoría de descuentos"*) y AT-4 regla 5 (§5):
+también el intento rechazado, porque *"un rechazo que nadie ve es un fraude que
+nadie investiga"*.
+
+**Decisión.** Una tabla, `pagaya.auditoria`, aislada por local como cualquier
+otra (AT-12) y **append-only en dos piezas**, porque ninguna alcanza sola:
+
+1. **El permiso que no se otorga.** `activar_aislamiento` da los cuatro
+   permisos a `pagaya_app` y la migración le revoca `UPDATE` y `DELETE`. Cubre
+   todo el código que escribimos, porque todo habla por ese rol (AT-13).
+2. **El disparador que sí ve un superusuario.** `BEFORE UPDATE OR DELETE OR
+   TRUNCATE … FOR EACH STATEMENT`. Los permisos y la *row level security* son
+   privilegios, y un privilegio se concede: un `GRANT` de más en una migración
+   futura, o una sesión de superusuario "arreglando un dato", pasan por el
+   costado de los dos. Un disparador se ejecuta igual para el dueño del esquema
+   y para el superusuario, y `FOR EACH STATEMENT` también falla el `DELETE` que
+   no alcanzaría ninguna fila y terminaría en silencio.
+
+De ahí salen las dos ausencias de claves foráneas que parecen descuidos:
+`entidad_id` **no** referencia nada —la fila tiene que sobrevivir a la comanda
+anulada que describe— y `local_id` **no** lleva cascada: borrar un local con
+auditoría falla, y la baja de un local es `local.activo = false` (migración
+0002), no un `DELETE`. Lo mismo para el mesero que ya corrigió algo (RF-A-03).
 
 | Alternativa | Motivo del descarte |
 |---|---|
-| Un índice único sobre `mesa.estado = 'ocupada'` | Confunde la causa con el efecto: `mesa.estado` lo mueve la máquina de estados de F1-10b, una capa de aplicación, y el día que esa capa tenga un bug de por medio la mesa queda "ocupada" sin comanda o "libre" con una abierta. La comanda es el dato; el estado de la mesa es su proyección. |
-| El candado en `sesion_mesa` en vez de en `comanda` | `sesion_mesa` es la entidad nueva de PRD-002 y `comanda` ya estaba nombrada como la que PRD-005 §6 refuerza. Poner el índice ahí exigiría además que toda apertura de sesión pasara por `sesion_mesa` antes que por `comanda`, un orden que ninguna tarea pidió. |
-| `SELECT … FOR UPDATE` sobre la mesa antes de insertar la comanda | Serializa cada apertura detrás de un candado de fila que vive en el código de la aplicación, no en el esquema: quien escriba la siguiente tarea que abra una comanda (F1-14a) tendría que acordarse de pedirlo. El índice lo hace imposible de olvidar. |
+| Solo revocar `UPDATE` y `DELETE` | Es la pieza más fuerte contra nuestro propio código y no vale nada contra quien tiene privilegio para concederse el permiso de vuelta, que es justo quien "arregla" un dato a mano. |
+| Solo el disparador | Un error nuestro —un `UPDATE` de más en un servicio— fallaría en tiempo de ejecución y no al revisar permisos. Las dos piezas fallan en momentos distintos, y eso es la ventaja. |
+| Un disparador que escriba la auditoría desde la base, por tabla auditada | Suena a que nadie puede olvidarse, pero el disparador no sabe *quién* actuó ni *por qué*: actor y motivo son datos de la aplicación (RF-M-08 exige motivo al corregir). Y lo que habría que auditar no es toda escritura, sino los hechos que PRD-001 §14 nombra. |
+| Versionar la fila (`UPDATE` con `valido_hasta`) | Hace de la corrección de la auditoría una operación normal. Lo que corrige un hecho es otra fila, no una enmienda de la anterior. |
 
 **Consecuencias.**
 
-- El error que ve quien intenta la segunda apertura es la violación del índice
-  `comanda_una_abierta_por_mesa`, no un mensaje de negocio: traducirlo es
-  trabajo de la capa que use este esquema (F1-10b, F1-14a), igual que
-  `acceso.ts` no traduce los `CHECK` de identidad de la migración 0003.
-- `comanda.version` (AT-3), `abierta_por` y `origen_primer_pedido` (PRD-005
-  §6) no están: la migración de F1-70a y la de quien implemente el origen del
-  primer pedido les agregan la columna, sin tocar ésta (AT-7, inmutable).
+- La clave es un `bigint` de identidad y no un `uuid`, al revés que todo el
+  esquema: `ocurrido_en` es `now()` y dos filas de la misma transacción lo
+  comparten letra por letra (AT-31), así que el orden de escritura necesita su
+  propia columna. Es un dato de la auditoría, no un detalle físico.
+- `actor_rol` es instantánea y no `JOIN`: RF-A-03 permite pasar de mesero a
+  administrador, y leer el rol actual reescribiría quién hizo qué. Mismo
+  argumento con el que AT-4 descartó recalcular el descuento al leer.
+- `datos jsonb` es el documento de AT-14: lo que RF-A-15 pide guardar cambió de
+  forma entre PRD-003 y PRD-006 y nada de eso sostiene una invariante. La que sí
+  —el descuento imposible— vive en `pago` con su `CHECK` (AT-4, capa 4). Esta
+  tabla registra el hecho; no es donde se impide el hecho imposible.
+- La retención queda abierta y anotada en §15.4, no como supuesto numerado: no
+  es un valor por defecto que esta tarea eligió, es una decisión que falta.
 
-### 13.2 Lo que F1-10a no crea, y por qué
+### 15.2 AT-31 — `registrar` recibe la transacción, no el acceso
 
-- **La máquina de estados** (F1-10b, en `@pagaya/mesa`). Esta migración declara
-  los valores válidos de `mesa.estado` y `comanda.estado` en un `CHECK`; quién
-  puede pasar de uno a otro es lógica de dominio, no del esquema.
-- **El PIN de mesa** (F1-12a). PRD-002 §3.1 lo liga a `sesion_mesa` y lo rota al
-  abrir cada sesión nueva (G-3): la tabla ya existe para que F1-12a la
-  referencie, pero el PIN hasheado no es columna de esta migración.
-- **Los clientes sentados y su vía de ingreso** (F1-41a, F1-13a). PRD-002 §3.4
-  los nombra como parte de la sesión; viven en la tabla de participantes que
-  todavía no existe, no en `sesion_mesa`.
-- **`abierta_por` y `origen_primer_pedido` en `comanda`** (PRD-005 §6). Son del
-  primer pedido del mesero, una decisión de F1-14a y F1-80b; agregarlos acá
-  sería decidir esa tarea desde ésta.
+**Qué lo exige.** La fila de F1-04 en el backlog, literal: la auditoría se
+escribe *"en la misma transacción que el cambio"*, y lo que el PR tiene que
+mostrar es *"una prueba de integración que confirme que una escritura de dominio
+y su fila de auditoría se confirman o revierten juntas"*. Es la misma exigencia
+que AT-2 le pone al outbox y que AT-4 le pone al rechazo del descuento: si la
+auditoría viaja aparte, el día que falle el cambio queda una fila contando algo
+que no pasó, y el día que falle la auditoría queda un cambio que nadie hizo.
+
+**Decisión.** `@pagaya/auditoria` exporta una sola función,
+`registrar(tx: Transaccion, registro): Promise<RegistroAuditado>`. Recibe la
+**transacción** de AT-13, no el `Acceso`: no puede abrir una propia, así que no
+existe la forma de escribir la auditoría fuera de la transacción del cambio.
+"En la misma transacción" deja de ser una convención que alguien respeta y pasa
+a ser lo único que el tipo permite. El `local` sale de `tx.mirada` y no de un
+parámetro —un parámetro podría decir un local distinto del que la transacción
+mira—, y las otras dos miradas se rechazan con `auditoria_invalida`: lo que
+PRD-001 §14 manda auditar pasa siempre dentro de un local.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| `registrar(acceso, …)`, que abre su propia transacción | Es exactamente el error que F1-04 pide hacer imposible, y se vería bien en la revisión de código: la llamada queda idéntica. |
+| Encolar la auditoría en el outbox de AT-2 y escribirla en el repartidor | El outbox es para lo que sale del sistema (push, SMS). La auditoría es un hecho interno que tiene que ser atómico con el cambio; el outbox garantiza "al menos una vez", no "exactamente con esto". |
+| Un disparador de base de datos por tabla auditada | Ver AT-30: la base no sabe quién actuó ni por qué. |
+| Que cada módulo escriba su `INSERT` a mano en su transacción | Atómico igual, pero el vocabulario de columnas se reinventa en cada módulo y el panel de RF-A-10 termina leyendo cinco formas distintas de decir lo mismo. |
+
+**Consecuencias.**
+
+- `@pagaya/auditoria` no importa ningún módulo de dominio y no podría: sería un
+  ciclo con todos (fronteras.json). Traducir un `Titular` de `@pagaya/identidad`
+  al `Actor` de este paquete es trabajo de quien llama.
+- El `Actor` admite `sistema` sin usuario, porque no todo lo auditable lo hace
+  una persona: el vencimiento de una sesión (PRD-004 §3) o una salida encolada
+  que se ejecuta sola (RF-C-21). Inventar un usuario para esos casos sería
+  falsear la fila.
+- Nadie obliga a un módulo de dominio a llamar a `registrar`. Esta tarea pone
+  la forma y la hace atómica; que la anulación de F1-44 audite es la prueba de
+  F1-44, no un mecanismo que esta tarea pueda imponer sin un disparador —que es
+  lo que AT-30 descartó, y con motivo.
+
+### 15.3 AT-32 — `accesoDelAmbiente`, para que la frontera no decida dónde se puede probar contra PostgreSQL
+
+**Qué lo exige.** La prueba de integración que F1-04 pide vive en
+`@pagaya/auditoria`, que por AT-5 solo puede importar `@pagaya/nucleo` y
+`@pagaya/base-datos`. En particular **no** `@pagaya/config`, que es lo que
+`crearAcceso` y `migrarAmbiente` reciben como parámetro. Sin resolverlo, los
+únicos lugares del repositorio donde se puede escribir una prueba contra
+PostgreSQL serían `@pagaya/base-datos` y `@pagaya/carga-inicial` — y eso no lo
+decidió nadie: es un efecto de que la configuración entre por un parámetro.
+
+**Decisión.** `@pagaya/base-datos` exporta `accesoDelAmbiente()`: carga el
+ambiente (`PAGAYA_AMBIENTE`, o `dev`), aplica las migraciones pendientes y
+devuelve el `Acceso`. Es la entrada de las pruebas de integración de los módulos
+transversales y de dominio, que son los que no ven la configuración. No afloja
+nada de AT-13: el pool sigue sin salir del paquete y las tres miradas siguen
+siendo las únicas tres; lo único que cambia es quién puede construir el objeto
+que las ofrece.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Agregar `@pagaya/config` al `puede_importar` de cada módulo | Un módulo de dominio que lee el ambiente decide por su cuenta a qué base le habla; AT-8 y AT-13 ponen eso en el proceso que lo hospeda, no en la regla de negocio. |
+| Poner la prueba en `@pagaya/base-datos` | Tendría que importar `@pagaya/auditoria`, que está una capa arriba: la frontera lo prohíbe por el mismo motivo que hace que el grafo no tenga ciclos. |
+| Un ayudante compartido en `scripts/` | Queda fuera de todo paquete y, por lo tanto, de la frontera que `fronteras.prueba.ts` verifica: sería la puerta por la que cualquier paquete importa cualquier cosa "porque es una prueba". |
+| Construir a mano un objeto con forma de `Configuracion` en la prueba | Compila por tipado estructural y se rompe en silencio el día que `Configuracion` gane un campo. |
+
+**Consecuencias.**
+
+- La prueba de F1-04 necesita `PAGAYA_BD_URL` y `PAGAYA_FIRMA_SESION`, como
+  toda prueba que carga un ambiente (§8.4). Se omite sin la primera y es
+  obligatoria con `PAGAYA_EXIGIR_BD=1`, que es lo que pone la CI.
+- `migrar: false` existe para quien ya migró y no quiere pagar el cerrojo de
+  asesoría otra vez; por defecto migra, porque las pruebas corren en procesos
+  separados y ninguna puede suponer que otra migró primero.
+
+### 15.4 Lo que F1-04 no crea, y por qué
+
+- **La lectura.** RF-A-10 y RF-A-15 son del panel del administrador, que es
+  Fase 4 (PRD-001 §18) y no tiene tarea en este backlog. El índice
+  `auditoria_por_entidad` está puesto para la consulta que esa tarea va a hacer
+  —el historial de una comanda, lo más reciente primero—, pero la consulta, los
+  filtros y qué ve un administrador son de ella.
+- **El vocabulario de acciones.** El esquema exige que `accion` y `entidad`
+  sean identificadores y no frases; cuáles existen lo fija cada tarea que
+  audita (F1-44a y F1-44b la corrección y la anulación con motivo, F1-80a y
+  F1-80b los eventos de PRD-004 §7 y PRD-005 §7, el descuento rechazado en la
+  Fase 2). Una lista cerrada hoy sería adivinar los nombres de hechos que
+  todavía no existen, y cambiarla pediría una migración por cada tarea.
+- **El actor de un hecho anterior a la cuenta.** F1-80a audita "registro
+  iniciado", que ocurre cuando todavía no hay fila en `usuario`: ese actor es
+  `sistema` y el detalle va en `datos`, o esa tarea decide otra cosa y la
+  escribe. Lo que esta tarea no hace es inventarle un usuario para que la
+  columna no quede nula.
+- **Que cada módulo audite.** Ver AT-31, última consecuencia.
+- **La retención y el archivado.** Una tabla que solo crece y que nadie puede
+  borrar necesita una política —archivar a otra tabla, exportar, o nada— antes
+  de que el piloto opere de verdad. Ningún PRD la pide todavía, y elegirla acá
+  sería decidir cuánta historia guarda el local sin que el local opine.
 
 ## 30. El límite de envíos de OTP, como puerto en memoria (F1-20c)
 

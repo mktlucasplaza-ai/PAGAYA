@@ -56,9 +56,15 @@ describe("la capa de acceso", () => {
   test("el paquete no deja salir el pool ni el cliente de pg", () => {
     // Si alguien exportara `crearPool` acá, la capa dejaría de ser única: se
     // podría consultar la base sin decir desde qué local se mira.
+    //
+    // `accesoDelAmbiente` (F1-04, AT-32) devuelve un `Acceso` y nada más: es
+    // quién puede construirlo lo que amplía —un paquete transversal o de
+    // dominio no puede importar @pagaya/config—, no lo que se puede hacer con
+    // él. Las tres miradas siguen siendo las únicas tres.
     assert.deepEqual(
       Object.keys(paquete).sort(),
       [
+        "accesoDelAmbiente",
         "aplicarMigraciones",
         "crearAcceso",
         "directorioMigraciones",
@@ -123,9 +129,31 @@ describe("aislamiento por local", { skip: hayBaseDatos ? false : "sin PAGAYA_BD_
    * Crear y borrar tablas no es trabajo de la aplicación: `pagaya_app` tiene
    * USAGE sobre el esquema y permisos sobre las tablas, no CREATE. El andamio
    * de esta prueba corre como el rol que conecta, igual que una migración.
+   *
+   * Cada sentencia va en una transacción que **primero** toma el candado de
+   * `pagaya.local`, y eso no es ceremonia: sin él hay abrazo mortal con los
+   * otros archivos de prueba, que corren en procesos paralelos. `DROP TABLE` de
+   * una tabla hija de `local` toma el candado de la hija y después el de
+   * `local` —para sacarle el disparador de integridad—, mientras un
+   * `DELETE FROM pagaya.local` de otro archivo toma el de `local` y después el
+   * de la hija, para la cascada. Dos órdenes opuestos son un ciclo, y
+   * PostgreSQL lo corta matando a uno: medido sobre `npm run pruebas`, 1 de
+   * cada 6 corridas moría con `deadlock detected`. Tomando `local` primero las
+   * dos quedan en el mismo orden y se esperan en vez de matarse.
    */
   async function comoDueno(sql: string, parametros: readonly unknown[] = []): Promise<void> {
-    await pool.query(sql, parametros as unknown[]);
+    const cliente = await pool.connect();
+    try {
+      await cliente.query("BEGIN");
+      await cliente.query("LOCK TABLE pagaya.local IN ACCESS EXCLUSIVE MODE");
+      await cliente.query(sql, parametros as unknown[]);
+      await cliente.query("COMMIT");
+    } catch (causa) {
+      await cliente.query("ROLLBACK").catch(() => undefined);
+      throw causa;
+    } finally {
+      cliente.release();
+    }
   }
 
   before(async () => {
