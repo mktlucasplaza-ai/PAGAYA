@@ -1696,3 +1696,56 @@ responde 200 con la carta vacía, porque no es un error, es RLS funcionando.
   QR (F1-11) necesita saber ese `id`, y hoy no hay ninguna ruta que lo
   resuelva desde algo más corto. Es la pregunta que F1-30b o F1-11 van a tener
   que responder, no esta tarea.
+
+## 46. La pantalla de la carta en `@pagaya/web` (F1-30b)
+
+**F1-30b** del [backlog](backlog-fase-1.md) expone RF-C-03 (mod.) — "ver la
+carta con categorías, foto, descripción, precio y disponibilidad" — mostrando
+lo que **F1-30a** (§45) ya sirve en `GET /locales/<id>/carta`. No agrega
+migraciones ni toca `@pagaya/api` ni `@pagaya/base-datos`.
+
+### AT-95 — Renderizar a string, sin marco de interfaz ni empaquetador todavía
+
+**Qué lo exige.** `apps/web/src/index.ts` (F1-01) ya deja dicho que el marco
+de interfaz y el empaquetador se eligen con el requisito que los decide,
+PRD-001 §14 (uso en gama baja y conexión pobre), y esa es la tarea **F1-30c**,
+no esta. AT-6 (§8.2) tampoco acepta un paso de compilación todavía.
+
+**Decisión.** `renderizarCarta(categorias)` en `pantallaCarta.ts` devuelve un
+string de HTML a partir de `RespuestaCarta` (tipo nuevo en `@pagaya/contrato`,
+junto a `rutaCarta`, espejo de lo que ya devuelve la ruta de F1-30a). Es puro:
+sin `document` ni `fetch`, así que la prueba de F1-30b ("muestra la carta
+completa de un local de prueba") corre con `node --test` armando el string
+esperado, sin navegador ni `jsdom`. Los colores y la tipografía son variables
+CSS en `estilos.css` (`--pagaya-color-*`, `--pagaya-tipografia-*`): hoy son una
+paleta neutra porque no hay identidad visual, y F1-30c (o quien la traiga) las
+cambia sin tocar el marcado.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Elegir ya un marco (React, una plantilla con Vite) | Es la decisión de F1-30c, que la ata al presupuesto de rendimiento (PRD-001 §14); elegirla acá la tomaría sin esa medición. |
+| Probarlo con `jsdom` montando el DOM real | Agrega una dependencia nueva para una pantalla que todavía no se sirve en un navegador (eso también es F1-30c); el string ya prueba el contenido que RF-C-03 pide. |
+| Mandar el HTML de la carta desde `@pagaya/api` | La API no sabe de interfaz (AT-1); mezclar marcado con la ruta de negocio obligaría a versionarlo junto al contrato de datos, no al de presentación. |
+
+La prueba de F1-30b arma una `RespuestaCarta` simulada (sin PostgreSQL ni
+`@pagaya/api` levantados); probar `renderizarCarta` contra la API real, de
+punta a punta, queda para F1-30c, que es quien monta el navegador o el
+entorno que puede llegar hasta ahí.
+
+### AT-96 — Lo agotado se muestra tachado y con aviso, nunca oculto
+
+**Qué lo exige.** AT-90 (§45) dejó explícito que ocultar `producto.disponible
+= false` sería "responder una pregunta distinta a la que RF-M-12 plantea" y
+que el cómo mostrarlo es decisión de esta tarea; RF-C-03 pide ver la
+disponibilidad, no inferirla por ausencia.
+
+**Decisión.** Cada producto agotado lleva la clase `producto--agotado` (nombre
+tachado por CSS) y un `<span class="producto__agotado">Agotado</span>` junto
+al nombre. Ningún producto se filtra ni se reordena por disponibilidad: el
+orden sigue siendo el de `orden` (AT-18), igual que lo entrega F1-30a.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Ocultar los agotados | Es exactamente lo que AT-90 ya descartó para la API; repetirlo en la pantalla contradice RF-C-03. |
+| Solo tachar, sin aviso de texto | El tachado no es accesible para lectores de pantalla ni se distingue bien en gama baja con poco contraste; el texto "Agotado" no depende de verlo. |
+| Mover los agotados al final de su categoría | Reordenar por disponibilidad es una decisión de producto que ningún RF pide hoy; además divergiría del orden que ya fija AT-18. |

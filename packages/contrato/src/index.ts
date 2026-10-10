@@ -30,3 +30,41 @@ export type RespuestaSalud = {
   readonly contrato: string;
   readonly ahora: string;
 };
+
+/**
+ * `GET /locales/<id>/carta` (F1-30a, arquitectura.md AT-90). Sin sesión: RF-C-24
+ * dice que explorar la carta no exige cuenta, solo saber de qué local.
+ */
+export function rutaCarta(local: string): string {
+  return `/locales/${local}/carta`;
+}
+
+export type VarianteCarta = {
+  readonly id: string;
+  readonly slug: string;
+  readonly nombre: string;
+  readonly precioDelta: number;
+};
+
+/** RF-C-03: categorías, foto, descripción, precio y disponibilidad. */
+export type ProductoCarta = {
+  readonly id: string;
+  readonly sku: string;
+  readonly nombre: string;
+  readonly descripcion: string;
+  readonly precio: number;
+  readonly disponible: boolean;
+  readonly foto: string | null;
+  readonly variantes: readonly VarianteCarta[];
+};
+
+export type CategoriaCarta = {
+  readonly id: string;
+  readonly slug: string;
+  readonly nombre: string;
+  readonly productos: readonly ProductoCarta[];
+};
+
+export type RespuestaCarta = {
+  readonly categorias: readonly CategoriaCarta[];
+};
