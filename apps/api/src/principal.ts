@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /** Punto de entrada del proceso API. */
+import { crearAcceso } from "@pagaya/base-datos";
 import { cargarConfiguracion } from "@pagaya/config";
 import { ErrorPagaya } from "@pagaya/nucleo";
 
@@ -7,7 +8,8 @@ import { MODULOS, crearServidor } from "./servidor.ts";
 
 try {
   const config = cargarConfiguracion();
-  const servidor = crearServidor(config);
+  const acceso = crearAcceso(config);
+  const servidor = crearServidor(config, { acceso });
 
   servidor.listen(config.api.puerto, () => {
     console.log(
@@ -19,7 +21,9 @@ try {
   for (const senal of ["SIGINT", "SIGTERM"] as const) {
     process.on(senal, () => {
       console.log(`${senal}: cerrando`);
-      servidor.close(() => process.exit(0));
+      servidor.close(() => {
+        acceso.cerrar().finally(() => process.exit(0));
+      });
     });
   }
 } catch (error) {

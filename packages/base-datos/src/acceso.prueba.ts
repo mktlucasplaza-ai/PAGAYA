@@ -62,6 +62,7 @@ describe("la capa de acceso", () => {
         "aplicarMigraciones",
         "crearAcceso",
         "directorioMigraciones",
+        "leerCarta",
         "listarMigraciones",
         "migrarAmbiente",
       ],

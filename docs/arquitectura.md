@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida`: agregada el 2026-10-10) |
+| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida` y §45 leer la carta sin sesión: agregadas el 2026-10-10) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -1608,3 +1608,45 @@ sesiones abiertas vinculadas a comandas de esa misma mesa.
 - **`abierta_por` y `origen_primer_pedido` en `comanda`** (PRD-005 §6). Son del
   primer pedido del mesero, una decisión de F1-14a y F1-80b; agregarlos acá
   sería decidir esa tarea desde ésta.
+
+## 45. Leer la carta sin sesión (F1-30a)
+
+**F1-30a** del [backlog](backlog-fase-1.md) expone RF-C-03 (mod. PRD-004 §2.2:
+"la carta se puede ver completa y sin registro") y RF-C-24 ("ver la carta […]
+sin registro"). Depende de **F1-06** (migración 0003, §12): lee `categoria`,
+`producto` y `variante`, y no agrega ninguna tabla ni columna.
+
+### AT-90 — Una ruta sin sesión, con el id del local en la URL; `conLocal` igual que cualquier lectura de negocio
+
+**Qué lo exige.** RF-C-24 pide la carta sin registro, no sin local: alguien
+tiene que decir de qué local, y AT-13 no tiene una cuarta forma de mirar la
+base además de `conLocal`, `sinLocal` y `entreLocales`. Explorar sin cuenta no
+es lo mismo que explorar sin local.
+
+**Decisión.** `GET /locales/<id>/carta` en `@pagaya/api`, sin leer ninguna
+cabecera de sesión, llama a `leerCarta(acceso, id)` en `@pagaya/base-datos`:
+`conLocal` filtra por `local_id` con la misma *row level security* que
+cualquier otra consulta (AT-13), y lo único que esta ruta no exige es una
+cuenta. `leerCarta` junta `categoria`, `producto` y `variante` por `orden`
+—el que el archivo de carga declaró (AT-18)— y devuelve `disponible` como
+campo, sin filtrar: RF-C-03 pide verla, no ocultar lo agotado. Un `id` que no
+es UUID responde 400 (el mismo `acceso_invalido` de AT-13); un local sin filas
+responde 200 con la carta vacía, porque no es un error, es RLS funcionando.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Resolver el local por `local.slug` en la URL | S-16 deja `slug` opcional *a propósito* y dice que se vuelve obligatorio "el día que salga en una URL", con su propia migración. Esta tarea no agrega migraciones; forzar `slug` en la ruta habría sido tomar esa decisión de paso, sin PRD ni migración que la respalde. |
+| Exigir el `qr_token` de una mesa para resolver el local | Acopla leer la carta a haber escaneado una mesa (RF-C-01), que es un flujo distinto y posterior (F1-11); RF-C-24 nombra la carta y la mesa como dos cosas separadas. |
+| Filtrar `producto.disponible = true` en la consulta | RF-C-03 es explícito: la carta muestra "precio **y disponibilidad**". Ocultar lo agotado sería responder una pregunta distinta a la que RF-M-12 plantea (mostrarlo tachado, por ejemplo), y esa es una decisión de UI de F1-30b, no de esta lectura. |
+| Autenticar la ruta igual, aunque sea con un token anónimo | PRD-004 §2.2 es categórico: "explorar nunca exige identidad". Inventar un token igual sería la misma exigencia con otro nombre. |
+
+**Consecuencias.**
+
+- `@pagaya/api` gana su primera dependencia real de `@pagaya/base-datos`
+  (ya declarada en `fronteras.json` desde F1-01) y su primera ruta de negocio;
+  `crearServidor` recibe el `Acceso` inyectado y `principal.ts` lo cierra al
+  apagarse, igual que ya cierra el servidor.
+- La URL lleva el `id` del local, no su `slug`: quien construya el enlace del
+  QR (F1-11) necesita saber ese `id`, y hoy no hay ninguna ruta que lo
+  resuelva desde algo más corto. Es la pregunta que F1-30b o F1-11 van a tener
+  que responder, no esta tarea.

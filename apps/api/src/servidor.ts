@@ -14,18 +14,24 @@
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
+import { leerCarta, type Acceso } from "@pagaya/base-datos";
 import type { Configuracion } from "@pagaya/config";
 import { RUTA_SALUD, VERSION_CONTRATO, type RespuestaSalud } from "@pagaya/contrato";
-import { relojDelSistema, type Reloj } from "@pagaya/nucleo";
+import { ErrorPagaya, relojDelSistema, type Reloj } from "@pagaya/nucleo";
 
 import { MODULOS } from "./modulos.ts";
 
 export type DependenciasApi = {
   readonly reloj?: Reloj;
+  readonly acceso?: Acceso;
 };
+
+/** `/locales/<uuid>/carta`. RF-C-03 y RF-C-24: la carta se ve sin sesión. */
+const RUTA_CARTA = /^\/locales\/([^/]+)\/carta$/;
 
 export function crearServidor(config: Configuracion, dependencias: DependenciasApi = {}): Server {
   const reloj = dependencias.reloj ?? relojDelSistema;
+  const acceso = dependencias.acceso;
 
   return createServer((peticion: IncomingMessage, respuesta: ServerResponse) => {
     const origen = peticion.headers.origin;
@@ -43,6 +49,32 @@ export function crearServidor(config: Configuracion, dependencias: DependenciasA
       };
       respuesta.writeHead(200, { "content-type": "application/json; charset=utf-8" });
       respuesta.end(JSON.stringify(cuerpo));
+      return;
+    }
+
+    const carta = RUTA_CARTA.exec(ruta);
+    if (carta !== null && peticion.method === "GET") {
+      if (acceso === undefined) {
+        respuesta.writeHead(503, { "content-type": "application/json; charset=utf-8" });
+        respuesta.end(JSON.stringify({ error: "sin_acceso_a_base_de_datos" }));
+        return;
+      }
+
+      const local = carta[1] as string;
+      leerCarta(acceso, local)
+        .then((categorias) => {
+          respuesta.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          respuesta.end(JSON.stringify({ categorias }));
+        })
+        .catch((error: unknown) => {
+          if (error instanceof ErrorPagaya && error.codigo === "acceso_invalido") {
+            respuesta.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+            respuesta.end(JSON.stringify({ error: error.codigo, detalle: error.message }));
+            return;
+          }
+          respuesta.writeHead(500, { "content-type": "application/json; charset=utf-8" });
+          respuesta.end(JSON.stringify({ error: "error_interno" }));
+        });
       return;
     }
 
