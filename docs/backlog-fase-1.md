@@ -21,9 +21,8 @@ ningún paquete de [fronteras.json](../fronteras.json); si lo comparten, van en
 serie en el orden de **Depende de**. Antes de abrir el workspace, el prompt
 reserva en [arquitectura.md](arquitectura.md) el número de sección siguiente
 al último publicado y, si decide algo de nivel AT, el número de AT siguiente
-al último (hoy: sección **16** en adelante —la **45** ya está usada— y
-**AT-33** en adelante, salvo **AT-90**), para que dos sub-tareas no peleen por
-el mismo número. **Terminada cuando** es lo único
+al último (hoy: sección **13** en adelante, **AT-20** en adelante), para que
+dos sub-tareas no peleen por el mismo número. **Terminada cuando** es lo único
 que el PR tiene que mostrar para cerrarse — un comando o una prueba, no una
 afirmación. **Modelo** no es una preferencia de estilo: es Opus cuando la
 sub-tarea decide esquema de base de datos, una invariante de dinero o de
@@ -73,7 +72,7 @@ identidad, o concurrencia; Sonnet en todo lo demás.
 | **F1-20** | **OTP: canal configurable (SMS por defecto), expiración, límite de intentos, límite de envíos por número y por dispositivo** | RF-C-02, PRD-004 §3 y §8, PRD-001 §14 | F1-03 | **5 d** | ver sub-tareas | todas sus sub-tareas terminadas | ver sub-tareas | Pendiente |
 | F1-20a | Puerto de envío de OTP (canal configurable, SMS por defecto) sobre el outbox de @pagaya/notificacion | RF-C-02, PRD-004 §3 | F1-03 | — | @pagaya/identidad, @pagaya/notificacion | Prueba unitaria: pedir un OTP encola un evento en el outbox con el canal configurado | Opus | Hecha |
 | F1-20b | Expiración y límite de intentos de verificación del OTP | RF-C-02, PRD-004 §8 | F1-20a | — | @pagaya/identidad | Prueba unitaria: un OTP vencido o que superó sus intentos se rechaza aunque el código sea correcto | Opus | Pendiente |
-| F1-20c | Límite de envíos por número y por dispositivo | RF-C-02, PRD-004 §8, PRD-001 §14 | F1-20a | — | @pagaya/identidad | Prueba unitaria: el envío N+1 dentro de la ventana configurada se rechaza | Sonnet | Pendiente |
+| F1-20c | Límite de envíos por número y por dispositivo | RF-C-02, PRD-004 §8, PRD-001 §14 | F1-20a | — | @pagaya/identidad | Prueba unitaria: el envío N+1 dentro de la ventana configurada se rechaza | Sonnet | Hecha |
 | **F1-21** | **Registro con nombre de pila, teléfono y OTP; una cuenta por teléfono; sesión persistente sin contraseña; menos de 40 s en gama baja** | RF-C-02 (mod.), RF-C-25 | F1-20 | **5 d** | ver sub-tareas | todas sus sub-tareas terminadas | ver sub-tareas | Pendiente |
 | F1-21a | Alta de cuenta (nombre, teléfono) reutilizando la cuenta existente si el teléfono ya está registrado | RF-C-02 (mod.) | F1-20b | — | @pagaya/identidad | Prueba de integración: un segundo registro con el mismo teléfono reutiliza la cuenta, no crea otra | Opus | Pendiente |
 | F1-21b | Sesión persistente sin contraseña tras verificar el OTP | RF-C-02 (mod.) | F1-21a | — | @pagaya/identidad | Prueba de integración: tras registrarse, el dispositivo queda con una sesión válida sin pedir contraseña | Opus | Pendiente |
@@ -91,7 +90,7 @@ identidad, o concurrencia; Sonnet en todo lo demás.
 |---|---|---|---|---|---|---|---|---|
 | **F1-30** | **Carta para el cliente: categorías, foto, descripción, precio y disponibilidad; sin registro; liviana para gama baja y mala señal** | RF-C-03 (mod.), RF-C-24, PRD-001 §14 | F1-05 | **6 d** | ver sub-tareas | todas sus sub-tareas terminadas | ver sub-tareas | Pendiente |
 | F1-30a | Lectura del catálogo (categorías, productos, precio, disponibilidad) sin registro | RF-C-03 (mod.), RF-C-24 | F1-06 | — | @pagaya/base-datos, @pagaya/api | Prueba de integración: pedir la carta sin sesión devuelve las categorías y productos del local cargado por F1-05 | Sonnet | Hecha |
-| F1-30b | Pantalla de la carta en @pagaya/web con foto y descripción | RF-C-03 (mod.) | F1-30a | — | @pagaya/web | Prueba end-to-end: muestra la carta completa de un local de prueba | Sonnet | Pendiente |
+| F1-30b | Pantalla de la carta en @pagaya/web con foto y descripción | RF-C-03 (mod.) | F1-30a | — | @pagaya/web | Prueba end-to-end: muestra la carta completa de un local de prueba | Sonnet | Hecha |
 | F1-30c | Presupuesto de rendimiento en gama baja y mala señal, contra el dispositivo/red/umbral de referencia que fije la decisión técnica del riesgo F1-30 | PRD-001 §14 | F1-30b | — | @pagaya/web | Una medición de primer pintado en el dispositivo y red de referencia queda bajo el umbral fijado en esa decisión técnica | Sonnet | Pendiente |
 | **F1-31** | **Armado del pedido: cantidad, notas y variantes; el carro sobrevive a recargas de la página** | RF-C-04 | F1-30 | **4 d** | ver sub-tareas | todas sus sub-tareas terminadas | ver sub-tareas | Pendiente |
 | F1-31a | Carro con cantidad, notas y variantes, persistido en el dispositivo | RF-C-04 | F1-30a | — | @pagaya/web | Prueba end-to-end: recargar la página con el carro armado lo encuentra intacto | Sonnet | Pendiente |

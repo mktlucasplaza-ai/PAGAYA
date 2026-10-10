@@ -1556,59 +1556,6 @@ cada `tipo` de evento.
 - El código del OTP viaja en el `payload` del evento, en claro. F1-70b decide
   si `evento_salida` lo cifra en reposo (PRD-001 §14) antes de entregarlo.
 
-**F1-10a** del [backlog](backlog-fase-1.md) agrega `mesa.estado` (PRD-001 §12 y
-§15) y la tabla `sesion_mesa` que PRD-002 §3.4 pide, con la invariante que
-PRD-005 §6 refuerza sobre la misma sesión: "como máximo una comanda abierta por
-mesa". Depende de **F1-02** —el aislamiento— y de la migración 0003, que ya
-dejó dicho que el estado de la mesa "es operación, lo maneja F1-10".
-
-### 13.1 AT-20 — La invariante es un índice parcial sobre `comanda`, no una columna de `mesa`
-
-**Qué lo exige.** PRD-005 §6, literal: "se refuerza la invariante: como máximo
-una comanda abierta por mesa". `mesa.estado` es la lectura operativa de ese
-hecho, no la fuente: una columna se desincroniza si algo la actualiza a medias,
-un índice único no puede.
-
-**Decisión.** `pagaya.comanda` nace mínima —`id`, `local_id`, `mesa_id`,
-`estado`— y un índice único parcial, `UNIQUE (local_id, mesa_id) WHERE estado =
-'abierta'`, es la invariante completa: dos transacciones que intenten abrir la
-segunda comanda de la misma mesa a la vez no pueden ganar las dos, sin
-`SELECT … FOR UPDATE` ni un candado aparte. `sesion_mesa` vincula mesa y
-comanda (PRD-002 §3.4) y es de a una por comanda, pero no repite el candado:
-mientras exista como máximo una comanda abierta por mesa, no puede haber dos
-sesiones abiertas vinculadas a comandas de esa misma mesa.
-
-| Alternativa | Motivo del descarte |
-|---|---|
-| Un índice único sobre `mesa.estado = 'ocupada'` | Confunde la causa con el efecto: `mesa.estado` lo mueve la máquina de estados de F1-10b, una capa de aplicación, y el día que esa capa tenga un bug de por medio la mesa queda "ocupada" sin comanda o "libre" con una abierta. La comanda es el dato; el estado de la mesa es su proyección. |
-| El candado en `sesion_mesa` en vez de en `comanda` | `sesion_mesa` es la entidad nueva de PRD-002 y `comanda` ya estaba nombrada como la que PRD-005 §6 refuerza. Poner el índice ahí exigiría además que toda apertura de sesión pasara por `sesion_mesa` antes que por `comanda`, un orden que ninguna tarea pidió. |
-| `SELECT … FOR UPDATE` sobre la mesa antes de insertar la comanda | Serializa cada apertura detrás de un candado de fila que vive en el código de la aplicación, no en el esquema: quien escriba la siguiente tarea que abra una comanda (F1-14a) tendría que acordarse de pedirlo. El índice lo hace imposible de olvidar. |
-
-**Consecuencias.**
-
-- El error que ve quien intenta la segunda apertura es la violación del índice
-  `comanda_una_abierta_por_mesa`, no un mensaje de negocio: traducirlo es
-  trabajo de la capa que use este esquema (F1-10b, F1-14a), igual que
-  `acceso.ts` no traduce los `CHECK` de identidad de la migración 0003.
-- `comanda.version` (AT-3), `abierta_por` y `origen_primer_pedido` (PRD-005
-  §6) no están: la migración de F1-70a y la de quien implemente el origen del
-  primer pedido les agregan la columna, sin tocar ésta (AT-7, inmutable).
-
-### 13.2 Lo que F1-10a no crea, y por qué
-
-- **La máquina de estados** (F1-10b, en `@pagaya/mesa`). Esta migración declara
-  los valores válidos de `mesa.estado` y `comanda.estado` en un `CHECK`; quién
-  puede pasar de uno a otro es lógica de dominio, no del esquema.
-- **El PIN de mesa** (F1-12a). PRD-002 §3.1 lo liga a `sesion_mesa` y lo rota al
-  abrir cada sesión nueva (G-3): la tabla ya existe para que F1-12a la
-  referencie, pero el PIN hasheado no es columna de esta migración.
-- **Los clientes sentados y su vía de ingreso** (F1-41a, F1-13a). PRD-002 §3.4
-  los nombra como parte de la sesión; viven en la tabla de participantes que
-  todavía no existe, no en `sesion_mesa`.
-- **`abierta_por` y `origen_primer_pedido` en `comanda`** (PRD-005 §6). Son del
-  primer pedido del mesero, una decisión de F1-14a y F1-80b; agregarlos acá
-  sería decidir esa tarea desde ésta.
-
 ## 15. El registro de auditoría (F1-04)
 
 **F1-04** del [backlog](backlog-fase-1.md) escribe la línea de PRD-001 §14 que
@@ -1775,6 +1722,52 @@ que las ofrece.
   de que el piloto opere de verdad. Ningún PRD la pide todavía, y elegirla acá
   sería decidir cuánta historia guarda el local sin que el local opine.
 
+## 30. El límite de envíos de OTP, como puerto en memoria (F1-20c)
+
+### Qué lo exige
+
+- **PRD-004 §8:** "límite de envíos por número y por dispositivo, para que el
+  OTP no sea un grifo de costo abierto". El tope en sí (cuántos por hora) no lo
+  fija ningún PRD: es configuración del local, no alcance.
+- **PRD-001 §14:** "OTP con expiración y límite de intentos" nombra la familia
+  de controles; F1-20c cubre el de envío, no el de verificación (F1-20b).
+- **AT-14 (§14):** el mismo motivo que sacó al proveedor de SMS detrás de
+  `Outbox` aplica acá: `identidad` no puede saber si el conteo de envíos vive
+  en memoria, en Redis o en una tabla.
+
+### Decisión
+
+`@pagaya/identidad` define el puerto `LimitadorEnvios` (`limite-envios.ts`),
+con un método, `registrar({ telefono, dispositivoId })`, que cuenta el intento
+contra una ventana de una hora y lanza `ErrorPagaya("limite_excedido", …)` si
+el número o el dispositivo ya alcanzaron `enviosPorNumeroPorHora` o
+`enviosPorDispositivoPorHora` (`LimitesOtp`, ya declarado en F1-20). Hoy el
+único adaptador es `limitadorEnviosEnMemoria`, con dos `Map` de marcas de
+tiempo. `crearServicioOtp` llama a `registrar` antes de encolar en el outbox:
+si rechaza, no se encola nada. `limites` es un parámetro obligatorio de
+`crearServicioOtp`, sin valor por defecto: el tope es configuración del local
+y fijarlo en el código sería la misma decisión silenciosa que AT-14 evitó para
+el canal.
+
+### Alternativas descartadas
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Tabla de PostgreSQL con los envíos de la última hora | Exige una migración que esta tarea no agrega (F1-70b todavía no existe); el puerto deja que esa tabla llegue después sin tocar `identidad`. |
+| Contar los envíos a partir de `evento_salida` (filtrando eventos `otp_solicitado`) | Acopla el límite al outbox de notificación, que es un detalle de entrega (AT-14); el límite es una regla de `identidad` sobre la petición, no sobre si el evento ya se despachó. |
+| Límite fijo en el código, sin parámetro | Es exactamente la decisión silenciosa que el canal de OTP ya evitó en F1-20a: el tope es dato de configuración del local, no una constante de `identidad`. |
+
+### Consecuencias
+
+- `limitadorEnviosEnMemoria` no persiste entre procesos ni entre instancias:
+  sirve hoy y para las pruebas; un local con más de un proceso de API necesita
+  un adaptador compartido (Redis o PostgreSQL) antes de producción, sin tocar
+  `crearServicioOtp`.
+- El código de error `limite_excedido` se agrega a `CodigoError`
+  (`@pagaya/nucleo`): un rechazo por límite es distinto de `sesion_invalida` o
+  `acceso_invalido`, y PRD-003 §5 exige que todo rechazo tenga un código que se
+  pueda contar.
+
 ## 45. Leer la carta sin sesión (F1-30a)
 
 **F1-30a** del [backlog](backlog-fase-1.md) expone RF-C-03 (mod. PRD-004 §2.2:
@@ -1816,3 +1809,56 @@ responde 200 con la carta vacía, porque no es un error, es RLS funcionando.
   QR (F1-11) necesita saber ese `id`, y hoy no hay ninguna ruta que lo
   resuelva desde algo más corto. Es la pregunta que F1-30b o F1-11 van a tener
   que responder, no esta tarea.
+
+## 46. La pantalla de la carta en `@pagaya/web` (F1-30b)
+
+**F1-30b** del [backlog](backlog-fase-1.md) expone RF-C-03 (mod.) — "ver la
+carta con categorías, foto, descripción, precio y disponibilidad" — mostrando
+lo que **F1-30a** (§45) ya sirve en `GET /locales/<id>/carta`. No agrega
+migraciones ni toca `@pagaya/api` ni `@pagaya/base-datos`.
+
+### AT-95 — Renderizar a string, sin marco de interfaz ni empaquetador todavía
+
+**Qué lo exige.** `apps/web/src/index.ts` (F1-01) ya deja dicho que el marco
+de interfaz y el empaquetador se eligen con el requisito que los decide,
+PRD-001 §14 (uso en gama baja y conexión pobre), y esa es la tarea **F1-30c**,
+no esta. AT-6 (§8.2) tampoco acepta un paso de compilación todavía.
+
+**Decisión.** `renderizarCarta(categorias)` en `pantallaCarta.ts` devuelve un
+string de HTML a partir de `RespuestaCarta` (tipo nuevo en `@pagaya/contrato`,
+junto a `rutaCarta`, espejo de lo que ya devuelve la ruta de F1-30a). Es puro:
+sin `document` ni `fetch`, así que la prueba de F1-30b ("muestra la carta
+completa de un local de prueba") corre con `node --test` armando el string
+esperado, sin navegador ni `jsdom`. Los colores y la tipografía son variables
+CSS en `estilos.css` (`--pagaya-color-*`, `--pagaya-tipografia-*`): hoy son una
+paleta neutra porque no hay identidad visual, y F1-30c (o quien la traiga) las
+cambia sin tocar el marcado.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Elegir ya un marco (React, una plantilla con Vite) | Es la decisión de F1-30c, que la ata al presupuesto de rendimiento (PRD-001 §14); elegirla acá la tomaría sin esa medición. |
+| Probarlo con `jsdom` montando el DOM real | Agrega una dependencia nueva para una pantalla que todavía no se sirve en un navegador (eso también es F1-30c); el string ya prueba el contenido que RF-C-03 pide. |
+| Mandar el HTML de la carta desde `@pagaya/api` | La API no sabe de interfaz (AT-1); mezclar marcado con la ruta de negocio obligaría a versionarlo junto al contrato de datos, no al de presentación. |
+
+La prueba de F1-30b arma una `RespuestaCarta` simulada (sin PostgreSQL ni
+`@pagaya/api` levantados); probar `renderizarCarta` contra la API real, de
+punta a punta, queda para F1-30c, que es quien monta el navegador o el
+entorno que puede llegar hasta ahí.
+
+### AT-96 — Lo agotado se muestra tachado y con aviso, nunca oculto
+
+**Qué lo exige.** AT-90 (§45) dejó explícito que ocultar `producto.disponible
+= false` sería "responder una pregunta distinta a la que RF-M-12 plantea" y
+que el cómo mostrarlo es decisión de esta tarea; RF-C-03 pide ver la
+disponibilidad, no inferirla por ausencia.
+
+**Decisión.** Cada producto agotado lleva la clase `producto--agotado` (nombre
+tachado por CSS) y un `<span class="producto__agotado">Agotado</span>` junto
+al nombre. Ningún producto se filtra ni se reordena por disponibilidad: el
+orden sigue siendo el de `orden` (AT-18), igual que lo entrega F1-30a.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Ocultar los agotados | Es exactamente lo que AT-90 ya descartó para la API; repetirlo en la pantalla contradice RF-C-03. |
+| Solo tachar, sin aviso de texto | El tachado no es accesible para lectores de pantalla ni se distingue bien en gama baja con poco contraste; el texto "Agotado" no depende de verlo. |
+| Mover los agotados al final de su categoría | Reordenar por disponibilidad es una decisión de producto que ningún RF pide hoy; además divergiría del orden que ya fija AT-18. |

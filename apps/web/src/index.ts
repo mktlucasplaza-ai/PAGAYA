@@ -28,3 +28,6 @@ export async function consultarSalud(
   }
   return (await respuesta.json()) as RespuestaSalud;
 }
+
+export { obtenerCarta } from "./carta.ts";
+export { formatoCLP, renderizarCarta } from "./pantallaCarta.ts";

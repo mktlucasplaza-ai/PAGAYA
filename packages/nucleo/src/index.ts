@@ -19,6 +19,7 @@ export type CodigoError =
   | "migracion_invalida"
   | "sesion_invalida"
   | "carga_invalida"
+  | "limite_excedido"
   | "auditoria_invalida"
   | "no_implementado";
 
