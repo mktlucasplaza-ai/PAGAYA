@@ -16,6 +16,9 @@ export type { Acceso, Fila, Mirada, OpcionesAcceso, Transaccion } from "./acceso
 
 export { migrarAmbiente } from "./postgres.ts";
 
+export { accesoDelAmbiente } from "./ambiente.ts";
+export type { OpcionesAmbiente } from "./ambiente.ts";
+
 export { leerCarta } from "./catalogo.ts";
 export type { CategoriaCarta, ProductoCarta, VarianteCarta } from "./catalogo.ts";
 
