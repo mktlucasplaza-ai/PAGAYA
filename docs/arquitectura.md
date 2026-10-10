@@ -1452,6 +1452,61 @@ PostgreSQL.
   (RF-A-07, RF-A-09, RF-A-18): son de las fases 2 y 3, el archivo no los nombra
   (§11.3) y `local.configuracion` los espera sin una columna por PRD (AT-14).
 
+## 13. Mesa y sesión de mesa (F1-10a)
+
+**F1-10a** del [backlog](backlog-fase-1.md) agrega `mesa.estado` (PRD-001 §12 y
+§15) y la tabla `sesion_mesa` que PRD-002 §3.4 pide, con la invariante que
+PRD-005 §6 refuerza sobre la misma sesión: "como máximo una comanda abierta por
+mesa". Depende de **F1-02** —el aislamiento— y de la migración 0003, que ya
+dejó dicho que el estado de la mesa "es operación, lo maneja F1-10".
+
+### 13.1 AT-20 — La invariante es un índice parcial sobre `comanda`, no una columna de `mesa`
+
+**Qué lo exige.** PRD-005 §6, literal: "se refuerza la invariante: como máximo
+una comanda abierta por mesa". `mesa.estado` es la lectura operativa de ese
+hecho, no la fuente: una columna se desincroniza si algo la actualiza a medias,
+un índice único no puede.
+
+**Decisión.** `pagaya.comanda` nace mínima —`id`, `local_id`, `mesa_id`,
+`estado`— y un índice único parcial, `UNIQUE (local_id, mesa_id) WHERE estado =
+'abierta'`, es la invariante completa: dos transacciones que intenten abrir la
+segunda comanda de la misma mesa a la vez no pueden ganar las dos, sin
+`SELECT … FOR UPDATE` ni un candado aparte. `sesion_mesa` vincula mesa y
+comanda (PRD-002 §3.4) y es de a una por comanda, pero no repite el candado:
+mientras exista como máximo una comanda abierta por mesa, no puede haber dos
+sesiones abiertas vinculadas a comandas de esa misma mesa.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Un índice único sobre `mesa.estado = 'ocupada'` | Confunde la causa con el efecto: `mesa.estado` lo mueve la máquina de estados de F1-10b, una capa de aplicación, y el día que esa capa tenga un bug de por medio la mesa queda "ocupada" sin comanda o "libre" con una abierta. La comanda es el dato; el estado de la mesa es su proyección. |
+| El candado en `sesion_mesa` en vez de en `comanda` | `sesion_mesa` es la entidad nueva de PRD-002 y `comanda` ya estaba nombrada como la que PRD-005 §6 refuerza. Poner el índice ahí exigiría además que toda apertura de sesión pasara por `sesion_mesa` antes que por `comanda`, un orden que ninguna tarea pidió. |
+| `SELECT … FOR UPDATE` sobre la mesa antes de insertar la comanda | Serializa cada apertura detrás de un candado de fila que vive en el código de la aplicación, no en el esquema: quien escriba la siguiente tarea que abra una comanda (F1-14a) tendría que acordarse de pedirlo. El índice lo hace imposible de olvidar. |
+
+**Consecuencias.**
+
+- El error que ve quien intenta la segunda apertura es la violación del índice
+  `comanda_una_abierta_por_mesa`, no un mensaje de negocio: traducirlo es
+  trabajo de la capa que use este esquema (F1-10b, F1-14a), igual que
+  `acceso.ts` no traduce los `CHECK` de identidad de la migración 0003.
+- `comanda.version` (AT-3), `abierta_por` y `origen_primer_pedido` (PRD-005
+  §6) no están: la migración de F1-70a y la de quien implemente el origen del
+  primer pedido les agregan la columna, sin tocar ésta (AT-7, inmutable).
+
+### 13.2 Lo que F1-10a no crea, y por qué
+
+- **La máquina de estados** (F1-10b, en `@pagaya/mesa`). Esta migración declara
+  los valores válidos de `mesa.estado` y `comanda.estado` en un `CHECK`; quién
+  puede pasar de uno a otro es lógica de dominio, no del esquema.
+- **El PIN de mesa** (F1-12a). PRD-002 §3.1 lo liga a `sesion_mesa` y lo rota al
+  abrir cada sesión nueva (G-3): la tabla ya existe para que F1-12a la
+  referencie, pero el PIN hasheado no es columna de esta migración.
+- **Los clientes sentados y su vía de ingreso** (F1-41a, F1-13a). PRD-002 §3.4
+  los nombra como parte de la sesión; viven en la tabla de participantes que
+  todavía no existe, no en `sesion_mesa`.
+- **`abierta_por` y `origen_primer_pedido` en `comanda`** (PRD-005 §6). Son del
+  primer pedido del mesero, una decisión de F1-14a y F1-80b; agregarlos acá
+  sería decidir esa tarea desde ésta.
+
 ## 14. El puerto de encolar, antes de `evento_salida` (F1-20a)
 
 ### Qué lo exige
@@ -1500,3 +1555,56 @@ cada `tipo` de evento.
   producción; eso lo reemplaza F1-70b sin tocar el código que llama a `Outbox`.
 - El código del OTP viaja en el `payload` del evento, en claro. F1-70b decide
   si `evento_salida` lo cifra en reposo (PRD-001 §14) antes de entregarlo.
+
+**F1-10a** del [backlog](backlog-fase-1.md) agrega `mesa.estado` (PRD-001 §12 y
+§15) y la tabla `sesion_mesa` que PRD-002 §3.4 pide, con la invariante que
+PRD-005 §6 refuerza sobre la misma sesión: "como máximo una comanda abierta por
+mesa". Depende de **F1-02** —el aislamiento— y de la migración 0003, que ya
+dejó dicho que el estado de la mesa "es operación, lo maneja F1-10".
+
+### 13.1 AT-20 — La invariante es un índice parcial sobre `comanda`, no una columna de `mesa`
+
+**Qué lo exige.** PRD-005 §6, literal: "se refuerza la invariante: como máximo
+una comanda abierta por mesa". `mesa.estado` es la lectura operativa de ese
+hecho, no la fuente: una columna se desincroniza si algo la actualiza a medias,
+un índice único no puede.
+
+**Decisión.** `pagaya.comanda` nace mínima —`id`, `local_id`, `mesa_id`,
+`estado`— y un índice único parcial, `UNIQUE (local_id, mesa_id) WHERE estado =
+'abierta'`, es la invariante completa: dos transacciones que intenten abrir la
+segunda comanda de la misma mesa a la vez no pueden ganar las dos, sin
+`SELECT … FOR UPDATE` ni un candado aparte. `sesion_mesa` vincula mesa y
+comanda (PRD-002 §3.4) y es de a una por comanda, pero no repite el candado:
+mientras exista como máximo una comanda abierta por mesa, no puede haber dos
+sesiones abiertas vinculadas a comandas de esa misma mesa.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Un índice único sobre `mesa.estado = 'ocupada'` | Confunde la causa con el efecto: `mesa.estado` lo mueve la máquina de estados de F1-10b, una capa de aplicación, y el día que esa capa tenga un bug de por medio la mesa queda "ocupada" sin comanda o "libre" con una abierta. La comanda es el dato; el estado de la mesa es su proyección. |
+| El candado en `sesion_mesa` en vez de en `comanda` | `sesion_mesa` es la entidad nueva de PRD-002 y `comanda` ya estaba nombrada como la que PRD-005 §6 refuerza. Poner el índice ahí exigiría además que toda apertura de sesión pasara por `sesion_mesa` antes que por `comanda`, un orden que ninguna tarea pidió. |
+| `SELECT … FOR UPDATE` sobre la mesa antes de insertar la comanda | Serializa cada apertura detrás de un candado de fila que vive en el código de la aplicación, no en el esquema: quien escriba la siguiente tarea que abra una comanda (F1-14a) tendría que acordarse de pedirlo. El índice lo hace imposible de olvidar. |
+
+**Consecuencias.**
+
+- El error que ve quien intenta la segunda apertura es la violación del índice
+  `comanda_una_abierta_por_mesa`, no un mensaje de negocio: traducirlo es
+  trabajo de la capa que use este esquema (F1-10b, F1-14a), igual que
+  `acceso.ts` no traduce los `CHECK` de identidad de la migración 0003.
+- `comanda.version` (AT-3), `abierta_por` y `origen_primer_pedido` (PRD-005
+  §6) no están: la migración de F1-70a y la de quien implemente el origen del
+  primer pedido les agregan la columna, sin tocar ésta (AT-7, inmutable).
+
+### 13.2 Lo que F1-10a no crea, y por qué
+
+- **La máquina de estados** (F1-10b, en `@pagaya/mesa`). Esta migración declara
+  los valores válidos de `mesa.estado` y `comanda.estado` en un `CHECK`; quién
+  puede pasar de uno a otro es lógica de dominio, no del esquema.
+- **El PIN de mesa** (F1-12a). PRD-002 §3.1 lo liga a `sesion_mesa` y lo rota al
+  abrir cada sesión nueva (G-3): la tabla ya existe para que F1-12a la
+  referencie, pero el PIN hasheado no es columna de esta migración.
+- **Los clientes sentados y su vía de ingreso** (F1-41a, F1-13a). PRD-002 §3.4
+  los nombra como parte de la sesión; viven en la tabla de participantes que
+  todavía no existe, no en `sesion_mesa`.
+- **`abierta_por` y `origen_primer_pedido` en `comanda`** (PRD-005 §6). Son del
+  primer pedido del mesero, una decisión de F1-14a y F1-80b; agregarlos acá
+  sería decidir esa tarea desde ésta.
