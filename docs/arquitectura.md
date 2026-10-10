@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06) |
+| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida`: agregada el 2026-10-10) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -1453,6 +1453,108 @@ PostgreSQL.
   (§11.3) y `local.configuracion` los espera sin una columna por PRD (AT-14).
 
 ## 13. Mesa y sesión de mesa (F1-10a)
+
+**F1-10a** del [backlog](backlog-fase-1.md) agrega `mesa.estado` (PRD-001 §12 y
+§15) y la tabla `sesion_mesa` que PRD-002 §3.4 pide, con la invariante que
+PRD-005 §6 refuerza sobre la misma sesión: "como máximo una comanda abierta por
+mesa". Depende de **F1-02** —el aislamiento— y de la migración 0003, que ya
+dejó dicho que el estado de la mesa "es operación, lo maneja F1-10".
+
+### 13.1 AT-20 — La invariante es un índice parcial sobre `comanda`, no una columna de `mesa`
+
+**Qué lo exige.** PRD-005 §6, literal: "se refuerza la invariante: como máximo
+una comanda abierta por mesa". `mesa.estado` es la lectura operativa de ese
+hecho, no la fuente: una columna se desincroniza si algo la actualiza a medias,
+un índice único no puede.
+
+**Decisión.** `pagaya.comanda` nace mínima —`id`, `local_id`, `mesa_id`,
+`estado`— y un índice único parcial, `UNIQUE (local_id, mesa_id) WHERE estado =
+'abierta'`, es la invariante completa: dos transacciones que intenten abrir la
+segunda comanda de la misma mesa a la vez no pueden ganar las dos, sin
+`SELECT … FOR UPDATE` ni un candado aparte. `sesion_mesa` vincula mesa y
+comanda (PRD-002 §3.4) y es de a una por comanda, pero no repite el candado:
+mientras exista como máximo una comanda abierta por mesa, no puede haber dos
+sesiones abiertas vinculadas a comandas de esa misma mesa.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Un índice único sobre `mesa.estado = 'ocupada'` | Confunde la causa con el efecto: `mesa.estado` lo mueve la máquina de estados de F1-10b, una capa de aplicación, y el día que esa capa tenga un bug de por medio la mesa queda "ocupada" sin comanda o "libre" con una abierta. La comanda es el dato; el estado de la mesa es su proyección. |
+| El candado en `sesion_mesa` en vez de en `comanda` | `sesion_mesa` es la entidad nueva de PRD-002 y `comanda` ya estaba nombrada como la que PRD-005 §6 refuerza. Poner el índice ahí exigiría además que toda apertura de sesión pasara por `sesion_mesa` antes que por `comanda`, un orden que ninguna tarea pidió. |
+| `SELECT … FOR UPDATE` sobre la mesa antes de insertar la comanda | Serializa cada apertura detrás de un candado de fila que vive en el código de la aplicación, no en el esquema: quien escriba la siguiente tarea que abra una comanda (F1-14a) tendría que acordarse de pedirlo. El índice lo hace imposible de olvidar. |
+
+**Consecuencias.**
+
+- El error que ve quien intenta la segunda apertura es la violación del índice
+  `comanda_una_abierta_por_mesa`, no un mensaje de negocio: traducirlo es
+  trabajo de la capa que use este esquema (F1-10b, F1-14a), igual que
+  `acceso.ts` no traduce los `CHECK` de identidad de la migración 0003.
+- `comanda.version` (AT-3), `abierta_por` y `origen_primer_pedido` (PRD-005
+  §6) no están: la migración de F1-70a y la de quien implemente el origen del
+  primer pedido les agregan la columna, sin tocar ésta (AT-7, inmutable).
+
+### 13.2 Lo que F1-10a no crea, y por qué
+
+- **La máquina de estados** (F1-10b, en `@pagaya/mesa`). Esta migración declara
+  los valores válidos de `mesa.estado` y `comanda.estado` en un `CHECK`; quién
+  puede pasar de uno a otro es lógica de dominio, no del esquema.
+- **El PIN de mesa** (F1-12a). PRD-002 §3.1 lo liga a `sesion_mesa` y lo rota al
+  abrir cada sesión nueva (G-3): la tabla ya existe para que F1-12a la
+  referencie, pero el PIN hasheado no es columna de esta migración.
+- **Los clientes sentados y su vía de ingreso** (F1-41a, F1-13a). PRD-002 §3.4
+  los nombra como parte de la sesión; viven en la tabla de participantes que
+  todavía no existe, no en `sesion_mesa`.
+- **`abierta_por` y `origen_primer_pedido` en `comanda`** (PRD-005 §6). Son del
+  primer pedido del mesero, una decisión de F1-14a y F1-80b; agregarlos acá
+  sería decidir esa tarea desde ésta.
+
+## 14. El puerto de encolar, antes de `evento_salida` (F1-20a)
+
+### Qué lo exige
+
+- **RF-C-02, PRD-004 §3:** el canal del OTP es configurable (SMS por defecto),
+  y el proveedor vive detrás de una interfaz (AT-1).
+- **AT-2 (§3):** ningún módulo de dominio llama al proveedor de notificación;
+  escribe un evento en la misma transacción que su cambio de negocio. La misma
+  razón que vale para el push vale para el OTP: un envío directo que se pierde
+  entre generar el código y mandarlo es la escritura doble que AT-2 ya descartó.
+- F1-20a llega antes que **F1-70b**, que es quien crea `evento_salida` y el
+  repartidor real. El camino crítico del backlog (F1-20 → F1-21 → F1-23, el más
+  largo de la Fase 1) no puede esperar a que esa tabla exista.
+
+### Decisión
+
+`@pagaya/notificacion` define el puerto `Outbox`, con un solo método:
+`encolar(evento: { tipo, payload }): Promise<EventoSalida>`, donde
+`EventoSalida` agrega `idEvento` y `creadoEn`. Es la forma mínima que AT-2 ya
+fijó para la tabla, expresada como interfaz de TypeScript en lugar de columnas.
+`identidad` llama a este puerto desde `crearServicioOtp` (`registro.ts`) para
+encolar un evento `otp_solicitado`, con el canal, el teléfono, el dispositivo y
+el código — nunca a un `ProveedorCodigo` directamente.
+
+**Contrato que F1-70b tiene que cumplir (AT-25):** su adaptador de PostgreSQL
+implementa `Outbox` contra `evento_salida`, en la misma transacción que lo
+llama (AT-2 ya lo exige); `idEvento` lo asigna la implementación, no el
+productor; `encolar` devuelve el evento con su `creadoEn`, para que quien lo
+llame pueda loguear sin una segunda consulta. El repartidor (`FOR UPDATE SKIP
+LOCKED`, `LISTEN/NOTIFY`) consume esos eventos y ahí, y solo ahí, vive el
+adaptador real que implementa `ProveedorCodigo` (`identidad/registro.ts`) para
+cada `tipo` de evento.
+
+### Alternativas descartadas
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Esperar a F1-70b para empezar el OTP | Rompe la cadena más larga del backlog (supuesto 7); el puerto deja avanzar F1-20a a F1-23 en paralelo con F1-70. |
+| `identidad` llama a un `ProveedorCodigo` (SMS) directamente | Viola AT-2 por el mismo motivo que lo prohíbe para el push: una escritura doble que se pierde en silencio. |
+| Una tabla de encolado propia de `identidad`, aparte de `evento_salida` | Duplicaría el repartidor y el orden por versión de AT-2; migrar esos eventos a la tabla real cuando F1-70b exista es trabajo que no aporta nada hoy. |
+
+### Consecuencias
+
+- `outboxEnMemoria` (`@pagaya/notificacion`) es el único adaptador que existe
+  hoy: no persiste entre procesos y no es el repartidor. Nunca entra a
+  producción; eso lo reemplaza F1-70b sin tocar el código que llama a `Outbox`.
+- El código del OTP viaja en el `payload` del evento, en claro. F1-70b decide
+  si `evento_salida` lo cifra en reposo (PRD-001 §14) antes de entregarlo.
 
 **F1-10a** del [backlog](backlog-fase-1.md) agrega `mesa.estado` (PRD-001 §12 y
 §15) y la tabla `sesion_mesa` que PRD-002 §3.4 pide, con la invariante que

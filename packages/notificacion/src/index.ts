@@ -7,11 +7,23 @@
  * (mod. por PRD-005) vive en el productor, que es quien sabe el origen del
  * ítem—, y eso es lo que mantiene el grafo sin ciclos.
  *
- * F1-01 deja el módulo vacío: su frontera está declarada en fronteras.json y
- * verificada por `make verify`, y sus reglas llegan con las tareas del backlog
- * que lo nombran. No hay reglas de negocio acá todavía.
+ * F1-01 deja el módulo vacío. F1-20a agrega el puerto `Outbox` (arquitectura.md
+ * §14, AT-25): la forma de encolar, antes de que exista `evento_salida`. El
+ * repartidor, la tabla real y los dos canales de entrega llegan con F1-70 a
+ * F1-73.
  */
 import type { DescriptorModulo } from "@pagaya/nucleo";
+
+export {
+  DEPENDENCIAS_OUTBOX_POR_DEFECTO,
+  idDeEvento,
+  type DependenciasOutbox,
+  type EventoSalida,
+  type NuevoEvento,
+  type Outbox,
+} from "./outbox.ts";
+
+export { outboxEnMemoria, type OutboxMemoria } from "./outbox-memoria.ts";
 
 export const modulo: DescriptorModulo = {
   nombre: "notificacion",
