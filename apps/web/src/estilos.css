@@ -1,0 +1,128 @@
+/**
+ * Estilos de la carta (F1-30b). Todavía no hay identidad visual: los colores
+ * y la tipografía son variables para reemplazarlas en un solo lugar cuando
+ * exista. Nada en las reglas de abajo debería nombrar un color o una fuente
+ * directamente.
+ */
+:root {
+  --pagaya-color-fondo: #ffffff;
+  --pagaya-color-texto: #1a1a1a;
+  --pagaya-color-texto-tenue: #5c5c5c;
+  --pagaya-color-borde: #e0e0e0;
+  --pagaya-color-superficie: #f5f5f5;
+  --pagaya-color-acento: #2b2b2b;
+  --pagaya-color-agotado: #b3261e;
+
+  --pagaya-tipografia: system-ui, sans-serif;
+  --pagaya-tipografia-tamano-base: 1rem;
+  --pagaya-tipografia-tamano-titulo: 1.25rem;
+
+  --pagaya-espacio: 0.75rem;
+  --pagaya-radio: 0.5rem;
+}
+
+.carta {
+  background: var(--pagaya-color-fondo);
+  color: var(--pagaya-color-texto);
+  font-family: var(--pagaya-tipografia);
+  font-size: var(--pagaya-tipografia-tamano-base);
+}
+
+.carta--vacia {
+  color: var(--pagaya-color-texto-tenue);
+  padding: var(--pagaya-espacio);
+  text-align: center;
+}
+
+.categoria {
+  margin-bottom: calc(var(--pagaya-espacio) * 2);
+}
+
+.categoria__nombre {
+  font-size: var(--pagaya-tipografia-tamano-titulo);
+  border-bottom: 1px solid var(--pagaya-color-borde);
+  padding-bottom: var(--pagaya-espacio);
+}
+
+.productos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pagaya-espacio);
+}
+
+.producto {
+  display: flex;
+  gap: var(--pagaya-espacio);
+  background: var(--pagaya-color-superficie);
+  border-radius: var(--pagaya-radio);
+  padding: var(--pagaya-espacio);
+}
+
+.producto--agotado {
+  opacity: 0.6;
+}
+
+.producto__foto {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: var(--pagaya-radio);
+  object-fit: cover;
+  flex: none;
+  background: var(--pagaya-color-borde);
+}
+
+.producto__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.producto__nombre {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.producto--agotado .producto__nombre {
+  text-decoration: line-through;
+}
+
+.producto__agotado {
+  text-decoration: none;
+  color: var(--pagaya-color-agotado);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.producto__descripcion {
+  color: var(--pagaya-color-texto-tenue);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.producto__precio {
+  color: var(--pagaya-color-acento);
+  font-weight: 600;
+  margin: 0;
+}
+
+.producto__variantes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.85rem;
+  color: var(--pagaya-color-texto-tenue);
+}
+
+.producto__variante {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--pagaya-espacio);
+}
