@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06) |
+| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida`: agregada el 2026-10-10) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -1451,3 +1451,52 @@ PostgreSQL.
 - **Los niveles, las propinas, los medios de pago y los datos de boleta**
   (RF-A-07, RF-A-09, RF-A-18): son de las fases 2 y 3, el archivo no los nombra
   (§11.3) y `local.configuracion` los espera sin una columna por PRD (AT-14).
+
+## 14. El puerto de encolar, antes de `evento_salida` (F1-20a)
+
+### Qué lo exige
+
+- **RF-C-02, PRD-004 §3:** el canal del OTP es configurable (SMS por defecto),
+  y el proveedor vive detrás de una interfaz (AT-1).
+- **AT-2 (§3):** ningún módulo de dominio llama al proveedor de notificación;
+  escribe un evento en la misma transacción que su cambio de negocio. La misma
+  razón que vale para el push vale para el OTP: un envío directo que se pierde
+  entre generar el código y mandarlo es la escritura doble que AT-2 ya descartó.
+- F1-20a llega antes que **F1-70b**, que es quien crea `evento_salida` y el
+  repartidor real. El camino crítico del backlog (F1-20 → F1-21 → F1-23, el más
+  largo de la Fase 1) no puede esperar a que esa tabla exista.
+
+### Decisión
+
+`@pagaya/notificacion` define el puerto `Outbox`, con un solo método:
+`encolar(evento: { tipo, payload }): Promise<EventoSalida>`, donde
+`EventoSalida` agrega `idEvento` y `creadoEn`. Es la forma mínima que AT-2 ya
+fijó para la tabla, expresada como interfaz de TypeScript en lugar de columnas.
+`identidad` llama a este puerto desde `crearServicioOtp` (`registro.ts`) para
+encolar un evento `otp_solicitado`, con el canal, el teléfono, el dispositivo y
+el código — nunca a un `ProveedorCodigo` directamente.
+
+**Contrato que F1-70b tiene que cumplir (AT-25):** su adaptador de PostgreSQL
+implementa `Outbox` contra `evento_salida`, en la misma transacción que lo
+llama (AT-2 ya lo exige); `idEvento` lo asigna la implementación, no el
+productor; `encolar` devuelve el evento con su `creadoEn`, para que quien lo
+llame pueda loguear sin una segunda consulta. El repartidor (`FOR UPDATE SKIP
+LOCKED`, `LISTEN/NOTIFY`) consume esos eventos y ahí, y solo ahí, vive el
+adaptador real que implementa `ProveedorCodigo` (`identidad/registro.ts`) para
+cada `tipo` de evento.
+
+### Alternativas descartadas
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Esperar a F1-70b para empezar el OTP | Rompe la cadena más larga del backlog (supuesto 7); el puerto deja avanzar F1-20a a F1-23 en paralelo con F1-70. |
+| `identidad` llama a un `ProveedorCodigo` (SMS) directamente | Viola AT-2 por el mismo motivo que lo prohíbe para el push: una escritura doble que se pierde en silencio. |
+| Una tabla de encolado propia de `identidad`, aparte de `evento_salida` | Duplicaría el repartidor y el orden por versión de AT-2; migrar esos eventos a la tabla real cuando F1-70b exista es trabajo que no aporta nada hoy. |
+
+### Consecuencias
+
+- `outboxEnMemoria` (`@pagaya/notificacion`) es el único adaptador que existe
+  hoy: no persiste entre procesos y no es el repartidor. Nunca entra a
+  producción; eso lo reemplaza F1-70b sin tocar el código que llama a `Outbox`.
+- El código del OTP viaja en el `payload` del evento, en claro. F1-70b decide
+  si `evento_salida` lo cifra en reposo (PRD-001 §14) antes de entregarlo.
