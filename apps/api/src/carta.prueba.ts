@@ -9,6 +9,7 @@ import { after, before, describe, test } from "node:test";
 
 import { crearAcceso, migrarAmbiente, type Acceso } from "@pagaya/base-datos";
 import { cargarConfiguracion, type Configuracion } from "@pagaya/config";
+import { rutaCarta } from "@pagaya/contrato";
 
 import { crearServidor } from "./servidor.ts";
 
@@ -79,7 +80,7 @@ describe("GET /locales/:id/carta, sin sesión", { skip: hayBaseDatos ? false : "
   });
 
   test("sin ningún encabezado de sesión, devuelve las categorías y productos del local", async () => {
-    const respuesta = await fetch(`${base}/locales/${LOCAL}/carta`);
+    const respuesta = await fetch(`${base}${rutaCarta(LOCAL)}`);
     assert.equal(respuesta.status, 200);
     const cuerpo = (await respuesta.json()) as {
       categorias: readonly {
@@ -113,12 +114,12 @@ describe("GET /locales/:id/carta, sin sesión", { skip: hayBaseDatos ? false : "
   });
 
   test("un id de local que no es un uuid responde 400, no 500", async () => {
-    const respuesta = await fetch(`${base}/locales/no-es-un-uuid/carta`);
+    const respuesta = await fetch(`${base}${rutaCarta("no-es-un-uuid")}`);
     assert.equal(respuesta.status, 400);
   });
 
   test("un local sin filas devuelve la carta vacía, no un error", async () => {
-    const respuesta = await fetch(`${base}/locales/00000000-0000-4000-8000-000000000000/carta`);
+    const respuesta = await fetch(`${base}${rutaCarta("00000000-0000-4000-8000-000000000000")}`);
     assert.equal(respuesta.status, 200);
     assert.deepEqual(await respuesta.json(), { categorias: [] });
   });

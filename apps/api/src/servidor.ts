@@ -16,7 +16,12 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 
 import { leerCarta, type Acceso } from "@pagaya/base-datos";
 import type { Configuracion } from "@pagaya/config";
-import { RUTA_SALUD, VERSION_CONTRATO, type RespuestaSalud } from "@pagaya/contrato";
+import {
+  RUTA_SALUD,
+  VERSION_CONTRATO,
+  type RespuestaCarta,
+  type RespuestaSalud,
+} from "@pagaya/contrato";
 import { ErrorPagaya, relojDelSistema, type Reloj } from "@pagaya/nucleo";
 
 import { MODULOS } from "./modulos.ts";
@@ -63,8 +68,9 @@ export function crearServidor(config: Configuracion, dependencias: DependenciasA
       const local = carta[1] as string;
       leerCarta(acceso, local)
         .then((categorias) => {
+          const cuerpo: RespuestaCarta = { categorias };
           respuesta.writeHead(200, { "content-type": "application/json; charset=utf-8" });
-          respuesta.end(JSON.stringify({ categorias }));
+          respuesta.end(JSON.stringify(cuerpo));
         })
         .catch((error: unknown) => {
           if (error instanceof ErrorPagaya && error.codigo === "acceso_invalido") {

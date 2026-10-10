@@ -1681,6 +1681,11 @@ cambia sin tocar el marcado.
 | Probarlo con `jsdom` montando el DOM real | Agrega una dependencia nueva para una pantalla que todavía no se sirve en un navegador (eso también es F1-30c); el string ya prueba el contenido que RF-C-03 pide. |
 | Mandar el HTML de la carta desde `@pagaya/api` | La API no sabe de interfaz (AT-1); mezclar marcado con la ruta de negocio obligaría a versionarlo junto al contrato de datos, no al de presentación. |
 
+La prueba de F1-30b arma una `RespuestaCarta` simulada (sin PostgreSQL ni
+`@pagaya/api` levantados); probar `renderizarCarta` contra la API real, de
+punta a punta, queda para F1-30c, que es quien monta el navegador o el
+entorno que puede llegar hasta ahí.
+
 ### AT-96 — Lo agotado se muestra tachado y con aviso, nunca oculto
 
 **Qué lo exige.** AT-90 (§45) dejó explícito que ocultar `producto.disponible
