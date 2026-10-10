@@ -19,6 +19,7 @@ export type CodigoError =
   | "migracion_invalida"
   | "sesion_invalida"
   | "carga_invalida"
+  | "limite_excedido"
   | "no_implementado";
 
 /** Error con código estable. `detalle` es para el humano, `codigo` para la máquina. */

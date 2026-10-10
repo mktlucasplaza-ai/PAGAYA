@@ -13,6 +13,11 @@
  * código y enviarlo, un envío directo lo pierde en silencio; encolado en la
  * misma transacción que el estado futuro del OTP (F1-20b), no—.
  *
+ * **F1-20c agrega el límite de envíos** (PRD-004 §8, PRD-001 §14) delante del
+ * outbox: `solicitarCodigo` pasa primero por un `LimitadorEnvios`
+ * (`limite-envios.ts`) y nunca encola si el número o el dispositivo ya
+ * agotaron su cupo de la hora.
+ *
  * Lo que F1-03 fijó y sigue valiendo:
  *
  * 1. **Todo camino de identidad termina en una sesión** abierta por
@@ -31,6 +36,7 @@
 import type { FuenteAleatoria } from "@pagaya/nucleo";
 import { DEPENDENCIAS_OUTBOX_POR_DEFECTO, type EventoSalida, type Outbox } from "@pagaya/notificacion";
 
+import { limitadorEnviosEnMemoria, type LimitadorEnvios } from "./limite-envios.ts";
 import type { DispositivoId, SesionAbierta, SesionId } from "./sesion.ts";
 
 /** PRD-004 §3: SMS por defecto, con alternativa por email o mensajería. */
@@ -79,16 +85,26 @@ export function generarCodigoOtp(aleatorio: FuenteAleatoria): string {
 
 /**
  * F1-20a: pedir un código encola un `EventoOtpSolicitado` en el outbox, con el
- * canal pedido. No valida límites de envío (F1-20c) ni persiste expiración o
- * intentos (F1-20b): esas son envolturas sobre esto, no parte de esto.
+ * canal pedido. **F1-20c** antepone el límite de envíos por número y por
+ * dispositivo (PRD-004 §8, PRD-001 §14): si el `LimitadorEnvios` rechaza el
+ * intento, no se encola nada. No persiste expiración ni intentos de
+ * verificación (F1-20b): esa es otra envoltura sobre esto, no parte de esto.
+ *
+ * `limites` es obligatorio y no tiene valor por defecto: cuántos envíos por
+ * hora tolera un número o un dispositivo es una configuración del local
+ * (PRD-004 §8), no una decisión que `identidad` pueda fijar en silencio.
  */
 export function crearServicioOtp(dependencias: {
   readonly outbox: Outbox;
+  readonly limites: LimitesOtp;
   readonly aleatorio?: FuenteAleatoria;
+  readonly limitador?: LimitadorEnvios;
 }): Pick<ServicioIdentidad, "solicitarCodigo"> {
   const aleatorio = dependencias.aleatorio ?? DEPENDENCIAS_OUTBOX_POR_DEFECTO.aleatorio;
+  const limitador = dependencias.limitador ?? limitadorEnviosEnMemoria({ limites: dependencias.limites });
   return {
     solicitarCodigo: async (peticion) => {
+      await limitador.registrar({ telefono: peticion.telefono, dispositivoId: peticion.dispositivoId });
       await dependencias.outbox.encolar<typeof TIPO_EVENTO_OTP_SOLICITADO, PayloadOtpSolicitado>({
         tipo: TIPO_EVENTO_OTP_SOLICITADO,
         payload: {

@@ -1609,6 +1609,52 @@ sesiones abiertas vinculadas a comandas de esa misma mesa.
   primer pedido del mesero, una decisión de F1-14a y F1-80b; agregarlos acá
   sería decidir esa tarea desde ésta.
 
+## 30. El límite de envíos de OTP, como puerto en memoria (F1-20c)
+
+### Qué lo exige
+
+- **PRD-004 §8:** "límite de envíos por número y por dispositivo, para que el
+  OTP no sea un grifo de costo abierto". El tope en sí (cuántos por hora) no lo
+  fija ningún PRD: es configuración del local, no alcance.
+- **PRD-001 §14:** "OTP con expiración y límite de intentos" nombra la familia
+  de controles; F1-20c cubre el de envío, no el de verificación (F1-20b).
+- **AT-14 (§14):** el mismo motivo que sacó al proveedor de SMS detrás de
+  `Outbox` aplica acá: `identidad` no puede saber si el conteo de envíos vive
+  en memoria, en Redis o en una tabla.
+
+### Decisión
+
+`@pagaya/identidad` define el puerto `LimitadorEnvios` (`limite-envios.ts`),
+con un método, `registrar({ telefono, dispositivoId })`, que cuenta el intento
+contra una ventana de una hora y lanza `ErrorPagaya("limite_excedido", …)` si
+el número o el dispositivo ya alcanzaron `enviosPorNumeroPorHora` o
+`enviosPorDispositivoPorHora` (`LimitesOtp`, ya declarado en F1-20). Hoy el
+único adaptador es `limitadorEnviosEnMemoria`, con dos `Map` de marcas de
+tiempo. `crearServicioOtp` llama a `registrar` antes de encolar en el outbox:
+si rechaza, no se encola nada. `limites` es un parámetro obligatorio de
+`crearServicioOtp`, sin valor por defecto: el tope es configuración del local
+y fijarlo en el código sería la misma decisión silenciosa que AT-14 evitó para
+el canal.
+
+### Alternativas descartadas
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Tabla de PostgreSQL con los envíos de la última hora | Exige una migración que esta tarea no agrega (F1-70b todavía no existe); el puerto deja que esa tabla llegue después sin tocar `identidad`. |
+| Contar los envíos a partir de `evento_salida` (filtrando eventos `otp_solicitado`) | Acopla el límite al outbox de notificación, que es un detalle de entrega (AT-14); el límite es una regla de `identidad` sobre la petición, no sobre si el evento ya se despachó. |
+| Límite fijo en el código, sin parámetro | Es exactamente la decisión silenciosa que el canal de OTP ya evitó en F1-20a: el tope es dato de configuración del local, no una constante de `identidad`. |
+
+### Consecuencias
+
+- `limitadorEnviosEnMemoria` no persiste entre procesos ni entre instancias:
+  sirve hoy y para las pruebas; un local con más de un proceso de API necesita
+  un adaptador compartido (Redis o PostgreSQL) antes de producción, sin tocar
+  `crearServicioOtp`.
+- El código de error `limite_excedido` se agrega a `CodigoError`
+  (`@pagaya/nucleo`): un rechazo por límite es distinto de `sesion_invalida` o
+  `acceso_invalido`, y PRD-003 §5 exige que todo rechazo tenga un código que se
+  pueda contar.
+
 ## 45. Leer la carta sin sesión (F1-30a)
 
 **F1-30a** del [backlog](backlog-fase-1.md) expone RF-C-03 (mod. PRD-004 §2.2:
