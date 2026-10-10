@@ -256,11 +256,19 @@ gestionarlo desde el primer día.
    `@pagaya/base-datos`; ninguna regla de negocio propia las justifica todavía
    como paquete aparte. Si una tarea de una fase posterior le agrega reglas
    (p. ej. promociones), ese es el momento de decidir el paquete — hoy sería
-   una capa vacía.
-10. **F1-63 asume "solo lectura" para el offline del mesero en Fase 1**, tal
-    como el riesgo de esa fila ya avisaba que haría falta decidir. No hay
-    escritura offline ni reconciliación contra `comanda.version` en las
-    sub-tareas F1-63a/b; aceptarlas es trabajo de otra tarea.
+   una capa vacía. **Decidido por el dueño del producto el 2026-10-10:** sin
+   paquete propio; se crea cuando lleguen las promociones u otra regla de la
+   carta.
+10. **F1-63 es "solo lectura" para el offline del mesero en Fase 1.** Sin
+    conexión, el mesero ve la última comanda cargada y un aviso de "sin
+    conexión"; no puede marcar entregado ni cargar ítems hasta reconectar. No
+    hay escritura offline ni reconciliación contra `comanda.version` en las
+    sub-tareas F1-63a/b; aceptarlas es trabajo de otra tarea. **Decidido por el
+    dueño del producto el 2026-10-10.** Cumple PRD-001 §13, que solo pide *ver*
+    la última comanda conocida. Alternativa descartada: aceptar escrituras sin
+    conexión y reconciliarlas al volver (rango de 8 a 13 d o más, y conflictos
+    con cambios hechos por otros mientras el mesero estaba desconectado); se
+    reabre solo si el piloto muestra que los meseros la necesitan.
 
 ## Riesgos de estimación
 
@@ -274,7 +282,7 @@ una dice qué información cerraría el rango.
 | **F1-70** — base de tiempo real | 10 d | 8–22 d | Es la tarea más grande y la única que se estima contra una **propuesta** y no contra código existente: outbox, repartidor con `FOR UPDATE SKIP LOCKED`, `LISTEN/NOTIFY`, versión de la comanda, reconexión y polling de respaldo ([arquitectura.md](arquitectura.md) AT-2 y AT-3). El requisito que la cierra no es funcional sino de latencia —menos de 3 s (PRD-001 §14)— y eso no se declara terminado, se mide: si el primer prototipo no entra en el presupuesto, el trabajo que sigue es de perfilamiento y rediseño, no de implementación. Además ocho tareas dependen de ella (cuatro de forma directa), así que su error no se queda en su fila. **Qué cierra el rango:** un prototipo de punta a punta que mida el atraso del repartidor bajo la carga de un local lleno, antes de estimar el resto de E7 — es, en esta versión del backlog, la sub-tarea **F1-70e**. |
 | **F1-20** — OTP | 5 d | 3–12 d | Lo incierto no es el código, es el tercero. Alta del comercio con un proveedor de SMS chileno, remitente aprobado, precio por mensaje y, sobre todo, la meta de PRD-004 §7: entrega en menos de 30 s en el 95 % de los casos. Eso no depende de nuestra implementación y no se puede verificar sin tráfico real; si el proveedor elegido no la cumple, la tarea pasa a incluir un segundo proveedor y la lógica de respaldo entre ambos. La propia §Cobertura ya avisa que conviene gestionarlo desde el primer día. **Qué cierra el rango:** una prueba de entrega con tráfico real de dos proveedores antes de comprometer la fecha. |
 | **F1-30** — carta del cliente | 6 d | 4–14 d | La parte funcional (categorías, foto, precio, disponibilidad) es predecible; la parte que no lo es viene de RF-C-03 (mod.) y PRD-001 §14: "liviana para gama baja y mala señal". **Ningún PRD define el teléfono de referencia, la red de referencia ni el umbral de primer pintado**, y [arquitectura.md](arquitectura.md) AT-1 convierte ese presupuesto en requisito de aceptación. Según dónde se fije la vara, esto es una lista con imágenes diferidas o un trabajo completo de pipeline de imágenes, CDN y renderizado en servidor. Es la primera pantalla de la primera visita, la que PRD-004 §1 dice que se cobra una sola vez, así que no es un lugar donde recortar. **Qué cierra el rango:** fijar dispositivo, red y umbral de referencia antes de empezar; es una decisión técnica, no un PRD. La sub-tarea **F1-30c** es justo esa medición, pero el umbral que usa todavía no está fijado. |
-| **F1-63** — comanda sin conexión | 5 d | 3–13 d | PRD-001 §13 pide una sola frase —"el mesero debe poder ver la última comanda conocida sin conexión"— y deja fuera todo lo que determina el costo: cuánto tiempo sin conexión hay que sostener, qué pasa con las acciones que el mesero intenta mientras está caído (marcar entregado, cargar un ítem) y cómo se reconcilia al volver. Si el alcance es solo lectura en caché, son 3 d; si hay que aceptar escrituras y reconciliarlas contra `comanda.version` (AT-3), es otra tarea. El offline es donde las estimaciones se rompen, y encima está al final de la cadena más larga del supuesto 7. **Qué cierra el rango:** decidir explícitamente "solo lectura en Fase 1" —y escribirlo— o aceptar el rango alto. Esta versión del backlog ya toma esa decisión como supuesto de planificación (supuesto 10) para poder dimensionar F1-63a/b; sigue pendiente que alguien la cierre con la autoridad para hacerlo. |
+| **F1-63** — comanda sin conexión | 5 d | 3–13 d | PRD-001 §13 pide una sola frase —"el mesero debe poder ver la última comanda conocida sin conexión"— y deja fuera todo lo que determina el costo: cuánto tiempo sin conexión hay que sostener, qué pasa con las acciones que el mesero intenta mientras está caído (marcar entregado, cargar un ítem) y cómo se reconcilia al volver. Si el alcance es solo lectura en caché, son 3 d; si hay que aceptar escrituras y reconciliarlas contra `comanda.version` (AT-3), es otra tarea. El offline es donde las estimaciones se rompen, y encima está al final de la cadena más larga del supuesto 7. **Qué cierra el rango:** decidir explícitamente "solo lectura en Fase 1" —y escribirlo— o aceptar el rango alto. Cerrado el 2026-10-10: solo lectura en Fase 1 (supuesto 10), así que vale el extremo bajo del rango. |
 | **F1-23** — muro de registro | 4 d | 3–10 d | La tarea parece de interfaz y es de sesiones. Un dispositivo entra a la mesa **sin registro** (F1-13, RF-C-24), arma su carro y en "Enviar pedido" se convierte en un usuario registrado: hay que migrar la sesión anónima a la del usuario sin perder el carro, sin duplicar el participante en la comanda y sin romper la idempotencia del envío (F1-40, PRD-001 §16) cuando el cliente abandona el registro y lo reintenta. Encima el resultado se mide contra RF-C-25 —menos de 40 s de punta a punta en gama baja, con el OTP adentro—, que depende de F1-20 y no de esta tarea. **Qué cierra el rango:** una prueba del camino completo anónimo → registrado → pedido enviado, con reintentos y abandono, escrita antes de la implementación. |
 
 **Rozaron la lista, y por qué quedaron fuera:** F1-71 (el proveedor de push y los
