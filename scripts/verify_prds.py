@@ -13,6 +13,9 @@ Comprueba, y falla con código 1 si algo no se cumple:
      como Vigente y es el de número más alto. Los anexos están enlazados.
   5. Inmutabilidad: ningún PRD que ya exista en la referencia base cambió.
   6. El backlog en docs/ no cita IDs de requisito que no existan en los PRDs.
+  7. docs/arquitectura.md no repite un número de sección (## N. / ### N.M) ni
+     define dos veces el mismo AT en un título: es la huella de un conflicto de
+     mezcla mal resuelto.
 """
 from __future__ import annotations
 
@@ -185,6 +188,32 @@ def check_citas_backlog(prds: list[tuple[int, Path]]) -> None:
             pasa(f"docs/{d.name}: {len(citados)} RF citados, todos existen")
 
 
+PATRON_TITULO_NUMERADO = re.compile(r"^#{2,3} (\d+(?:\.\d+)?)[. ]")
+PATRON_TITULO_AT = re.compile(r"^#{2,3} .*?\b(AT-\d+)\b")
+
+
+def check_titulos_arquitectura() -> None:
+    p = DOCS / "arquitectura.md"
+    if not p.is_file():
+        return
+    vistos: dict[str, int] = {}
+    repetidos: list[str] = []
+    for i, linea in enumerate(p.read_text(encoding="utf-8").splitlines(), start=1):
+        for patron in (PATRON_TITULO_NUMERADO, PATRON_TITULO_AT):
+            m = patron.match(linea)
+            if not m:
+                continue
+            clave = m.group(1)
+            if clave in vistos:
+                repetidos.append(f"{clave} (líneas {vistos[clave]} y {i})")
+            else:
+                vistos[clave] = i
+    if repetidos:
+        falla(f"docs/arquitectura.md: títulos repetidos: {', '.join(repetidos)}")
+    else:
+        pasa(f"docs/arquitectura.md: {len(vistos)} números de sección y AT, ninguno repetido")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", help="referencia git contra la que se verifica la inmutabilidad")
@@ -201,6 +230,7 @@ def main() -> int:
     check_indice(prds)
     check_inmutabilidad(prds, args.base)
     check_citas_backlog(prds)
+    check_titulos_arquitectura()
 
     for linea in ok:
         print(f"  ok   {linea}")

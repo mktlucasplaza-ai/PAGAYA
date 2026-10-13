@@ -18,11 +18,20 @@
 Una sub-tarea (`F1-nna`, `F1-nnb`…) es un workspace de Conductor. Dos
 workspaces corren en paralelo solo si sus columnas **Paquetes** no comparten
 ningún paquete de [fronteras.json](../fronteras.json); si lo comparten, van en
-serie en el orden de **Depende de**. Antes de abrir el workspace, el prompt
-reserva en [arquitectura.md](arquitectura.md) el número de sección siguiente
-al último publicado y, si decide algo de nivel AT, el número de AT siguiente
-al último (hoy: sección **13** en adelante, **AT-20** en adelante), para que
-dos sub-tareas no peleen por el mismo número. **Terminada cuando** es lo único
+serie en el orden de **Depende de**. Los paquetes se reparten en tres
+carriles, y cada carril numera sus secciones y AT de
+[arquitectura.md](arquitectura.md) dentro de su bloque, para que dos
+sub-tareas en paralelo no peleen por el mismo número:
+
+| Carril | Paquetes | Secciones | AT |
+|---|---|---|---|
+| 1 · base de datos y mesa | `base-datos` (todas las migraciones), `mesa`, `comanda`, `auditoria`, `notificacion` | 15–29 | AT-30 a AT-59 |
+| 2 · identidad | `identidad` | 30–44 | AT-60 a AT-89 |
+| 3 · carta, web y api | `web`, `api` | 45–59 | AT-90 a AT-119 |
+
+El prompt de cada workspace dice qué número usa; `make verify` falla si un
+número de sección o un AT se repite en un título. Solo el carril 1 crea
+migraciones, porque deben ir seguidas. **Terminada cuando** es lo único
 que el PR tiene que mostrar para cerrarse — un comando o una prueba, no una
 afirmación. **Modelo** no es una preferencia de estilo: es Opus cuando la
 sub-tarea decide esquema de base de datos, una invariante de dinero o de
