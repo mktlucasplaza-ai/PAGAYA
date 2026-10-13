@@ -29,3 +29,9 @@ export {
   type ResultadoMesa,
   type ResultadoSesion,
 } from "./estados.ts";
+
+export {
+  leerEstadoMesa,
+  type EstadoMesaLeido,
+  type SesionMesaLeida,
+} from "./lectura.ts";

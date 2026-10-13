@@ -1995,3 +1995,35 @@ ausente o corrupto vuelve como carro vacío, no como pantalla rota.
 | `sessionStorage` en vez de `localStorage` | `sessionStorage` no sobrevive a cerrar la pestaña, y en el dispositivo de un cliente real (gama baja, PRD-001 §14) una pestaña en segundo plano puede morir y perder el carro; la fila pide explícitamente que sobreviva a la recarga. |
 | Leer `localStorage` directo en `carro.ts`, sin el tipo `Almacen` | Habría acoplado las funciones del carro al navegador, igual que AT-95 evitó acoplar `renderizarCarta` a `document`; la prueba de "recargar la página" no podría correr con `node --test`. |
 
+## 48. El estado de la mesa, expuesto sin recalcularlo (F1-10c)
+
+**F1-10c** del [backlog](backlog-fase-1.md) expone PRD-001 §15: el estado de
+`pagaya.mesa` y la última `sesion_mesa` (migración 0004, §13), que F1-10b
+(§16) ya tipó como `EstadoMesa`/`EstadoSesionMesa`. No agrega migraciones ni
+transiciones: solo lee lo que F1-10a escribió y F1-10b tipó.
+
+### AT-102 — La lectura vive en `@pagaya/mesa`, no en `@pagaya/base-datos` ni en `@pagaya/api`
+
+**Qué lo exige.** `fronteras.json` no deja que `@pagaya/base-datos` (capa
+`infraestructura`) importe `@pagaya/mesa` (capa `dominio`): si la lectura
+viviera en `base-datos`, como `leerCarta`, tendría que redeclarar
+`EstadoMesa`/`EstadoSesionMesa` a mano, exactamente el "recálculo" que esta
+tarea tiene prohibido. `@pagaya/mesa` sí puede importar `@pagaya/base-datos`
+(ya lo hace, `fronteras.json`), así que la lectura entra por ahí.
+
+**Decisión.** `leerEstadoMesa(acceso, local, mesaId)` en
+`packages/mesa/src/lectura.ts` usa `Acceso.conLocal` para leer `mesa.estado` y
+la `sesion_mesa` más reciente de esa mesa (por `abierta_en`), y devuelve
+`EstadoMesa`/`EstadoSesionMesa` de `estados.ts` sin tocarlos. `GET
+/locales/<local>/mesas/<mesa>/estado` en `apps/api` llama a esa función y
+tipa su respuesta como `RespuestaEstadoMesa` (`@pagaya/contrato`, junto a
+`rutaEstadoMesa`) — el mismo patrón de `rutaCarta`/`RespuestaCarta` (§45):
+el servidor no puede devolver un campo que el contrato no declaró, porque
+`tsc` lo rechaza. Una mesa sin fila responde 404; una sesión inexistente
+(mesa que nunca abrió) es `sesion: null`, no un error.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Repetir `leerCarta` y poner la lectura en `@pagaya/base-datos` | Obligaría a `base-datos` a redeclarar los estados de mesa a mano o a `@pagaya/api` a mapearlos después de leer texto plano — las dos formas del "recalcular" que esta tarea evita. |
+| Resolver la sesión activa por `comanda.estado = 'abierta'` en vez de la más reciente de `sesion_mesa` | Una comanda `pagada` o `anulada` deja la mesa sin sesión "abierta" aunque su historia reciente importe para el panel del mesero; ordenar por `abierta_en` sirve a los dos casos de la fila ("mesa abierta y cerrada") sin un `JOIN` contra `comanda`. |
+| Llamar a `ocuparMesa`/`abrirSesion` para "confirmar" el estado leído | Esas funciones son para decidir una transición nueva (F1-14a), no para validar una ya escrita; pasarles el estado leído y descartar su resultado sería ejercitar código de escritura en una ruta de solo lectura. |
