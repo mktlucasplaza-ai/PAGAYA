@@ -1722,6 +1722,48 @@ que las ofrece.
   de que el piloto opere de verdad. Ningún PRD la pide todavía, y elegirla acá
   sería decidir cuánta historia guarda el local sin que el local opine.
 
+## 16. La máquina de estados de la mesa y su sesión (F1-10b)
+
+**F1-10b** del [backlog](backlog-fase-1.md) decide quién mueve `mesa.estado` y
+`sesion_mesa.estado`, que la migración 0004 (§13) dejó declarados en un `CHECK`
+sin dueño. Depende de **F1-10a**.
+
+### 16.1 AT-33 — Funciones puras y totales, y solo las tres transiciones que hoy tienen RF
+
+**Qué lo exige.** PRD-001 §15 dibuja el ciclo completo de la mesa (`libre →
+ocupada → pago_pendiente → pagada → libre`) y PRD-002 §3.4 dice que la sesión
+"se abre al primer ingreso […] y se cierra con el pago y la liberación", pero
+ninguna tarea del backlog de Fase 1 produce todavía `pago_pendiente` ni
+`pagada`: esos dos llegan con el pago, que PRD-002 §3.4 ubica en Fase 2.
+`bloqueada` tampoco tiene RF que diga quién la activa. F1-10b nombra tres
+acciones —abrir, ocupar, cerrar— y no cinco: construir las dos que faltan
+sería adivinar una regla que ningún PRD escribió.
+
+**Decisión.** `@pagaya/mesa/estados.ts` exporta cuatro funciones puras
+—`ocuparMesa`, `cerrarMesa`, `abrirSesion`, `cerrarSesion`— que reciben el
+estado actual (nunca una fila ni una conexión) y devuelven `{ aplicada: true,
+estado }` o `{ aplicada: false, motivo }`, igual que `puedeVerComanda` en
+`@pagaya/identidad/acceso` (AT-11). Mesa solo transiciona `libre ⇄ ocupada`;
+sesión solo `(sin fila) ⇄ abierta ⇄ cerrada`. Quien persiste (F1-10c, F1-14a)
+lee el estado real, llama a la función y escribe el resultado en la misma
+transacción que ya exige el índice único de AT-20.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Modelar ya los cinco estados de `mesa.estado` | `pago_pendiente`, `pagada` y `bloqueada` no tienen una tarea que los produzca hoy; sus reglas de transición (¿quién bloquea? ¿se puede ocupar una mesa bloqueada?) quedarían inventadas sin RF que las respalde. |
+| Lanzar `ErrorPagaya` en vez de devolver un resultado | La transición inválida no es una falla del sistema, es una decisión de negocio que quien llama necesita inspeccionar (qué acción, desde qué estado) para decidir qué mostrar; un `throw` obliga a un `try/catch` en cada llamada para el camino normal. |
+| Una sola función combinada `abrirMesa` que mueva mesa y sesión a la vez | F1-10c solo necesita leer el estado, no escribirlo; acoplar las dos transiciones en una función le exigiría pasar un estado de sesión que no tiene. Los cuatro verbos sueltos sirven a los dos llamadores sin que ninguno cargue con el estado del otro. |
+
+**Consecuencias.**
+
+- Extender la máquina a `pago_pendiente`, `pagada` o `bloqueada` es decisión de
+  la tarea de Fase 2 que primero las necesite, con su propio motivo y sus
+  propias alternativas descartadas — no una ampliación silenciosa de este
+  archivo.
+- F1-15 (cierre de la sesión con rotación de PIN) envuelve `cerrarMesa` y
+  `cerrarSesion`; no repite la transición, solo le agrega los efectos que
+  PRD-002 §3.4 pide al cerrar.
+
 ## 30. El límite de envíos de OTP, como puerto en memoria (F1-20c)
 
 ### Qué lo exige

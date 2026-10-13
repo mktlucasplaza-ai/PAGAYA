@@ -16,3 +16,16 @@ export const modulo: DescriptorModulo = {
   capa: "dominio",
   responsabilidad: "Mesa, sesión de mesa, QR y PIN rotativo (F1-10 a F1-15; RF-C-01, RF-M-09, RF-M-17; PRD-002 §3).",
 };
+
+export {
+  abrirSesion,
+  cerrarMesa,
+  cerrarSesion,
+  ocuparMesa,
+  type EstadoMesa,
+  type EstadoSesionMesa,
+  type MotivoTransicionMesaInvalida,
+  type MotivoTransicionSesionInvalida,
+  type ResultadoMesa,
+  type ResultadoSesion,
+} from "./estados.ts";
