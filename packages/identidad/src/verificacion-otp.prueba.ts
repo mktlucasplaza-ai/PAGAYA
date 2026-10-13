@@ -155,6 +155,53 @@ describe("verificarCodigo", () => {
   });
 });
 
+describe("intentos simultáneos", () => {
+  test("varios intentos fallidos en paralelo nunca pasan de `intentosPorCodigo`", async () => {
+    const instante = { valor: Date.UTC(2026, 0, 1, 12, 0, 0) };
+    const { servicioOtp, codigoEncolado } = servicio(instante);
+
+    await servicioOtp.solicitarCodigo({ telefono: TELEFONO, canal: "sms", dispositivoId: DISPOSITIVO });
+    const codigo = codigoEncolado();
+    const enParalelo = LIMITES.intentosPorCodigo + 5;
+
+    const resultados = await Promise.all(
+      Array.from({ length: enParalelo }, () =>
+        servicioOtp.verificarCodigo({
+          telefono: TELEFONO,
+          dispositivoId: DISPOSITIVO,
+          codigo: codigoDistintoDe(codigo),
+        }),
+      ),
+    );
+
+    const motivos = resultados.map((resultado) => (resultado.ok ? "aceptado" : resultado.motivo));
+    const cobrados = motivos.filter((motivo) => motivo === "codigo_incorrecto").length;
+    const rechazados = motivos.filter((motivo) => motivo === "intentos_agotados").length;
+
+    assert.equal(cobrados, LIMITES.intentosPorCodigo, `se cobraron ${cobrados} intentos con un tope de ${LIMITES.intentosPorCodigo}`);
+    assert.equal(rechazados, enParalelo - LIMITES.intentosPorCodigo);
+
+    const conElCorrecto = await servicioOtp.verificarCodigo({ telefono: TELEFONO, dispositivoId: DISPOSITIVO, codigo });
+    assert.deepEqual(conElCorrecto, { ok: false, motivo: "intentos_agotados", intentosRestantes: 0 });
+  });
+
+  test("el mismo código acertado en paralelo consume el OTP una sola vez", async () => {
+    const instante = { valor: Date.UTC(2026, 0, 1, 12, 0, 0) };
+    const { servicioOtp, codigoEncolado } = servicio(instante, { ...LIMITES, intentosPorCodigo: 5 });
+
+    await servicioOtp.solicitarCodigo({ telefono: TELEFONO, canal: "sms", dispositivoId: DISPOSITIVO });
+    const codigo = codigoEncolado();
+
+    const resultados = await Promise.all(
+      Array.from({ length: 3 }, () =>
+        servicioOtp.verificarCodigo({ telefono: TELEFONO, dispositivoId: DISPOSITIVO, codigo }),
+      ),
+    );
+
+    assert.equal(resultados.filter((resultado) => resultado.ok).length, 1);
+  });
+});
+
 describe("estadoDeOtp", () => {
   const base: OtpPendiente = {
     telefono: TELEFONO,

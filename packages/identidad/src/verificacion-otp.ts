@@ -54,22 +54,6 @@ export type OtpPendiente = {
   readonly consumidoEn: Date | null;
 };
 
-/**
- * Lo único que la verificación necesita de la persistencia. Lo implementará el
- * carril 1 contra PostgreSQL, con las columnas de arquitectura.md §31; acá es
- * un puerto para que la regla se pueda probar sin base encendida, igual que
- * `RepositorioSesiones`.
- *
- * `guardar` es un *upsert* por `ClaveOtp`: **hay un solo OTP por teléfono y
- * dispositivo**, y pedir uno nuevo pisa al anterior. No es un detalle del
- * adaptador en memoria, es la regla —ver §31— y en PostgreSQL la impone una
- * clave única, no el código que la llama.
- */
-export type RepositorioOtp = {
-  guardar(otp: OtpPendiente): Promise<void>;
-  ultimo(clave: ClaveOtp): Promise<OtpPendiente | null>;
-};
-
 export type MotivoRechazoOtp =
   | "sin_codigo"
   | "codigo_vencido"
@@ -82,6 +66,55 @@ export type VerificacionOtp =
   | { readonly ok: false; readonly motivo: MotivoRechazoOtp; readonly intentosRestantes: number };
 
 export type EstadoOtp = "vigente" | "vencido" | "consumido" | "intentos_agotados";
+
+/**
+ * El resultado de `registrarIntento`. Cuando es `ok`, el contador **ya subió**
+ * y `otp.intentos` es el valor de después: quien llama no vuelve a escribirlo.
+ */
+export type IntentoRegistrado =
+  | { readonly ok: true; readonly otp: OtpPendiente }
+  | { readonly ok: false; readonly motivo: Exclude<MotivoRechazoOtp, "codigo_incorrecto"> };
+
+/**
+ * Lo único que la verificación necesita de la persistencia. Lo implementará el
+ * carril 1 contra PostgreSQL, con las columnas de arquitectura.md §31; acá es
+ * un puerto para que la regla se pueda probar sin base encendida, igual que
+ * `RepositorioSesiones`.
+ *
+ * `guardar` es un *upsert* por `ClaveOtp`: **hay un solo OTP por teléfono y
+ * dispositivo**, y pedir uno nuevo pisa al anterior. No es un detalle del
+ * adaptador en memoria, es la regla —ver §31— y en PostgreSQL la impone una
+ * clave única, no el código que la llama.
+ *
+ * **`registrarIntento` y `consumir` son operaciones atómicas, y eso es parte
+ * del contrato, no del adaptador.** Contar leyendo el OTP y volviéndolo a
+ * guardar deja una ventana entre la lectura y la escritura: dos intentos
+ * simultáneos leen el mismo contador, los dos lo suben a lo mismo y el tope de
+ * PRD-001 §14 se salta con solo pedir en paralelo. Por eso el puerto no expone
+ * una lectura seguida de una escritura, sino la operación completa. En
+ * PostgreSQL cada una es **una sola sentencia**: ver arquitectura.md §31.
+ */
+export type RepositorioOtp = {
+  guardar(otp: OtpPendiente): Promise<void>;
+
+  /**
+   * Sube el contador en una sola operación y **solo si el OTP está vigente**
+   * (no consumido, no vencido, con intentos por debajo de `intentosPorCodigo`);
+   * si no lo está, no toca nada y devuelve por qué.
+   */
+  registrarIntento(peticion: {
+    readonly clave: ClaveOtp;
+    readonly intentosPorCodigo: number;
+    readonly ahora: Date;
+  }): Promise<IntentoRegistrado>;
+
+  /**
+   * Marca el OTP como usado, también en una sola operación y solo si seguía sin
+   * consumir. Devuelve `null` si otro lo consumió primero: es lo que hace que
+   * un código acertado dos veces en paralelo abra una sola puerta.
+   */
+  consumir(peticion: { readonly clave: ClaveOtp; readonly ahora: Date }): Promise<OtpPendiente | null>;
+};
 
 /** sha256 del código. Es la misma huella de `sesion.ts`: una sola forma de guardar un secreto corto. */
 export function huellaDeCodigo(codigo: string): string {
@@ -101,7 +134,9 @@ export function estadoDeOtp(otp: OtpPendiente, ahora: Date, intentosPorCodigo: n
 }
 
 /** Cada estado que saca al OTP de juego tiene su propio motivo: PRD-003 §5 pide poder contarlos por separado. */
-const RECHAZO_POR_ESTADO: Readonly<Record<Exclude<EstadoOtp, "vigente">, MotivoRechazoOtp>> = {
+const RECHAZO_POR_ESTADO: Readonly<
+  Record<Exclude<EstadoOtp, "vigente">, Exclude<MotivoRechazoOtp, "codigo_incorrecto">>
+> = {
   vencido: "codigo_vencido",
   consumido: "codigo_consumido",
   intentos_agotados: "intentos_agotados",
@@ -120,8 +155,10 @@ function huellasIguales(una: string, otra: string): boolean {
  * distinguir *por qué* falló para contarlo (PRD-003 §5), y un fallo esperado no
  * es una excepción.
  *
- * Un intento fallido se cuenta y se persiste; uno acertado consume el OTP, para
- * que el mismo código no sirva dos veces.
+ * **El intento se cobra antes de mirar el código**, en la operación atómica del
+ * puerto: así el tope vale aunque lleguen varios intentos a la vez, y así un
+ * vencido o un agotado se rechazan sin haber comparado nada. Un acierto consume
+ * el OTP, también atómicamente, para que el mismo código no sirva dos veces.
  */
 export async function verificarCodigo({
   repositorio,
@@ -137,24 +174,20 @@ export async function verificarCodigo({
   readonly reloj?: Reloj;
 }): Promise<VerificacionOtp> {
   const ahora = reloj.ahora();
-  const otp = await repositorio.ultimo(clave);
-  if (otp === null) return { ok: false, motivo: "sin_codigo", intentosRestantes: 0 };
+  const intento = await repositorio.registrarIntento({
+    clave,
+    intentosPorCodigo: limites.intentosPorCodigo,
+    ahora,
+  });
+  if (!intento.ok) return { ok: false, motivo: intento.motivo, intentosRestantes: 0 };
 
-  const estado = estadoDeOtp(otp, ahora, limites.intentosPorCodigo);
-  if (estado !== "vigente") return { ok: false, motivo: RECHAZO_POR_ESTADO[estado], intentosRestantes: 0 };
-
-  if (!huellasIguales(otp.huellaCodigo, huellaDeCodigo(codigo))) {
-    const fallido: OtpPendiente = { ...otp, intentos: otp.intentos + 1 };
-    await repositorio.guardar(fallido);
-    return {
-      ok: false,
-      motivo: "codigo_incorrecto",
-      intentosRestantes: Math.max(0, limites.intentosPorCodigo - fallido.intentos),
-    };
+  const intentosRestantes = Math.max(0, limites.intentosPorCodigo - intento.otp.intentos);
+  if (!huellasIguales(intento.otp.huellaCodigo, huellaDeCodigo(codigo))) {
+    return { ok: false, motivo: "codigo_incorrecto", intentosRestantes };
   }
 
-  const consumido: OtpPendiente = { ...otp, intentos: otp.intentos + 1, consumidoEn: ahora };
-  await repositorio.guardar(consumido);
+  const consumido = await repositorio.consumir({ clave, ahora });
+  if (consumido === null) return { ok: false, motivo: "codigo_consumido", intentosRestantes: 0 };
   return { ok: true, otp: consumido };
 }
 
@@ -164,6 +197,12 @@ export async function verificarCodigo({
  * migraciones. No persiste entre procesos ni entre instancias, así que un
  * local con más de un proceso de API necesita el adaptador de PostgreSQL
  * (arquitectura.md §31) antes de producción, sin tocar esta regla.
+ *
+ * **Cómo cumple la atomicidad que el puerto exige:** `registrarIntento` y
+ * `consumir` leen y escriben el `Map` sin ningún `await` en el medio, así que
+ * nada se intercala entre las dos mitades. Es lo mismo que en PostgreSQL hace
+ * una sola sentencia; lo que no se puede es volver a partirlo en una lectura y
+ * una escritura separadas, acá ni allá.
  */
 export function repositorioOtpEnMemoria(): RepositorioOtp {
   const porClave = new Map<string, OtpPendiente>();
@@ -173,6 +212,26 @@ export function repositorioOtpEnMemoria(): RepositorioOtp {
     guardar: async (otp) => {
       porClave.set(llave(otp), otp);
     },
-    ultimo: async (clave) => porClave.get(llave(clave)) ?? null,
+
+    registrarIntento: async ({ clave, intentosPorCodigo, ahora }) => {
+      const otp = porClave.get(llave(clave));
+      if (otp === undefined) return { ok: false, motivo: "sin_codigo" };
+
+      const estado = estadoDeOtp(otp, ahora, intentosPorCodigo);
+      if (estado !== "vigente") return { ok: false, motivo: RECHAZO_POR_ESTADO[estado] };
+
+      const intentado: OtpPendiente = { ...otp, intentos: otp.intentos + 1 };
+      porClave.set(llave(clave), intentado);
+      return { ok: true, otp: intentado };
+    },
+
+    consumir: async ({ clave, ahora }) => {
+      const otp = porClave.get(llave(clave));
+      if (otp === undefined || otp.consumidoEn !== null) return null;
+
+      const consumido: OtpPendiente = { ...otp, consumidoEn: ahora };
+      porClave.set(llave(clave), consumido);
+      return consumido;
+    },
   };
 }

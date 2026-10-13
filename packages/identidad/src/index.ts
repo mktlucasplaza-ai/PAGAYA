@@ -94,6 +94,7 @@ export {
   verificarCodigo,
   type ClaveOtp,
   type EstadoOtp,
+  type IntentoRegistrado,
   type MotivoRechazoOtp,
   type OtpPendiente,
   type RepositorioOtp,
