@@ -1810,6 +1810,57 @@ el canal.
   `acceso_invalido`, y PRD-003 §5 exige que todo rechazo tenga un código que se
   pueda contar.
 
+## 31. La verificación del OTP: expiración e intentos (F1-20b)
+
+### Qué lo exige
+
+- **PRD-001 §14:** "OTP con expiración y límite de intentos". §30 cubrió el de
+  **envíos**; éste es el de **verificación**, que es otro control.
+- **PRD-004 §8:** el modelo de datos de la verificación son cuatro campos,
+  "teléfono, canal, intentos, expiración". F1-20b tampoco crea esa tabla —la
+  crea el carril 1—: el estado entra por un puerto, igual que en §30.
+
+### Decisión (AT-60)
+
+`@pagaya/identidad` define `RepositorioOtp` (`verificacion-otp.ts`).
+`solicitarCodigo` guarda el OTP pendiente con `guardar` —*upsert* por teléfono
+y dispositivo: hay **un solo OTP vigente por par**— antes de encolar el evento.
+`verificarCodigo` cobra el intento primero y mira el código después: un
+vencido, un consumido o un agotado se rechaza **aunque el código sea
+correcto**. El código se guarda como sha256 (la misma huella del token de
+sesión), se compara en tiempo constante y un acierto lo consume.
+
+**Cobrar el intento es una sola operación atómica, y eso vive en el puerto:**
+`registrarIntento` sube el contador solo si el OTP está vigente y devuelve el
+estado resultante; `consumir` marca el uso solo si seguía sin consumir. **El
+adaptador de PostgreSQL hace cada una en un único `UPDATE … SET intentos =
+intentos + 1 WHERE … AND intentos < $n … RETURNING`**, nunca un `SELECT`
+seguido de un `UPDATE`: en esa ventana dos intentos simultáneos leen el mismo
+contador y el tope se salta pidiendo en paralelo.
+
+**Columnas de la tabla del carril 1** (`verificacion_otp`): `telefono` y
+`dispositivo_id` —únicos juntos: ahí vive la regla del único OTP por par—,
+`canal`, `huella_codigo`, `creado_en`, `expira_en`, `intentos`, `consumido_en`.
+**Sin `local_id`:** §9.3 deja a identidad fuera del aislamiento por local.
+
+### Alternativas descartadas
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Contar leyendo el OTP, sumando uno y volviéndolo a guardar | La ventana entre la lectura y la escritura deja pasar el tope: medido antes de cambiarlo, `Promise.all` de ocho intentos sobre un tope de tres cobra los ocho. Hay una prueba que lo fija. |
+| Guardar el código en claro | Es la decisión que `Sesion.huellaToken` ya tomó por PRD-001 §14: un secreto corto en claro en una tabla es un secreto en claro en cada respaldo y en cada registro de errores. Para comparar basta la huella. |
+| Clave solo por teléfono, sin dispositivo | Un código pedido desde un dispositivo se podría probar desde cualquier otro; `confirmar` ya recibe los dos datos, así que atarlo al par no cuesta nada y cierra el camino. |
+| Lanzar `ErrorPagaya` como hace el límite de envíos | PRD-003 §5 pide poder contar los rechazos por motivo, y acá hay cinco distintos. Un fallo esperado de credencial es un resultado, no una excepción: `autenticar` ya lo decidió así. |
+
+### Consecuencias
+
+- `repositorioOtpEnMemoria` no persiste entre procesos ni entre instancias,
+  igual que `limitadorEnviosEnMemoria` y `outboxEnMemoria`: sirve hoy y para
+  las pruebas, y el de PostgreSQL entra sin tocar `verificarCodigo`.
+- Un sha256 de seis dígitos se enumera en un millón de intentos: lo que de
+  verdad protege son la vigencia y el tope. Si PRD-001 §14 exige además cifrado
+  en reposo para esa columna, lo decide el carril 1 con la tabla.
+
 ## 45. Leer la carta sin sesión (F1-30a)
 
 **F1-30a** del [backlog](backlog-fase-1.md) expone RF-C-03 (mod. PRD-004 §2.2:

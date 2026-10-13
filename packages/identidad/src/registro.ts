@@ -18,6 +18,11 @@
  * (`limite-envios.ts`) y nunca encola si el número o el dispositivo ya
  * agotaron su cupo de la hora.
  *
+ * **F1-20b agrega la expiración y el límite de intentos de verificación**
+ * (`verificacion-otp.ts`, arquitectura.md §31): `solicitarCodigo` guarda el
+ * OTP pendiente y `verificarCodigo` lo rechaza si venció, si ya se usó o si
+ * agotó sus intentos, **aunque el código sea correcto**.
+ *
  * Lo que F1-03 fijó y sigue valiendo:
  *
  * 1. **Todo camino de identidad termina en una sesión** abierta por
@@ -33,11 +38,18 @@
  *    acá puede abrir una sesión a partir de un código corto; el QR personal de
  *    60 s es otra cosa y llega en Fase 3.
  */
-import type { FuenteAleatoria } from "@pagaya/nucleo";
+import { relojDelSistema, type FuenteAleatoria, type Reloj } from "@pagaya/nucleo";
 import { DEPENDENCIAS_OUTBOX_POR_DEFECTO, type EventoSalida, type Outbox } from "@pagaya/notificacion";
 
 import { limitadorEnviosEnMemoria, type LimitadorEnvios } from "./limite-envios.ts";
 import type { DispositivoId, SesionAbierta, SesionId } from "./sesion.ts";
+import {
+  huellaDeCodigo,
+  repositorioOtpEnMemoria,
+  verificarCodigo,
+  type RepositorioOtp,
+  type VerificacionOtp,
+} from "./verificacion-otp.ts";
 
 /** PRD-004 §3: SMS por defecto, con alternativa por email o mensajería. */
 export type CanalOtp = "sms" | "email" | "mensajeria";
@@ -84,37 +96,79 @@ export function generarCodigoOtp(aleatorio: FuenteAleatoria): string {
 }
 
 /**
+ * Lo que F1-20 entrega hoy: pedir el código y probarlo. **No abre sesión ni
+ * crea la cuenta** —eso es `confirmar`, de F1-21—: `verificarCodigo` solo
+ * responde si ese código, para ese teléfono y ese dispositivo, todavía vale.
+ */
+export type ServicioOtp = Pick<ServicioIdentidad, "solicitarCodigo"> & {
+  /** F1-20b. */
+  verificarCodigo(peticion: {
+    readonly telefono: string;
+    readonly dispositivoId: DispositivoId;
+    readonly codigo: string;
+  }): Promise<VerificacionOtp>;
+};
+
+/**
  * F1-20a: pedir un código encola un `EventoOtpSolicitado` en el outbox, con el
  * canal pedido. **F1-20c** antepone el límite de envíos por número y por
  * dispositivo (PRD-004 §8, PRD-001 §14): si el `LimitadorEnvios` rechaza el
- * intento, no se encola nada. No persiste expiración ni intentos de
- * verificación (F1-20b): esa es otra envoltura sobre esto, no parte de esto.
+ * intento, no se encola nada. **F1-20b** guarda el OTP pendiente —su huella,
+ * su vencimiento y sus intentos— en `RepositorioOtp` **antes** de encolar: si
+ * el encolado falla, sobra un código que nadie recibió y que vence solo; al
+ * revés, el cliente recibiría un código imposible de verificar. Cuando existan
+ * las dos tablas, las dos escrituras van en la misma transacción (AT-2).
  *
  * `limites` es obligatorio y no tiene valor por defecto: cuántos envíos por
- * hora tolera un número o un dispositivo es una configuración del local
- * (PRD-004 §8), no una decisión que `identidad` pueda fijar en silencio.
+ * hora tolera un número o un dispositivo, cuánto dura el código y cuántos
+ * intentos admite son configuración del local (PRD-004 §8), no una decisión
+ * que `identidad` pueda fijar en silencio.
  */
 export function crearServicioOtp(dependencias: {
   readonly outbox: Outbox;
   readonly limites: LimitesOtp;
   readonly aleatorio?: FuenteAleatoria;
+  readonly reloj?: Reloj;
   readonly limitador?: LimitadorEnvios;
-}): Pick<ServicioIdentidad, "solicitarCodigo"> {
+  readonly repositorioOtp?: RepositorioOtp;
+}): ServicioOtp {
   const aleatorio = dependencias.aleatorio ?? DEPENDENCIAS_OUTBOX_POR_DEFECTO.aleatorio;
-  const limitador = dependencias.limitador ?? limitadorEnviosEnMemoria({ limites: dependencias.limites });
+  const reloj = dependencias.reloj ?? relojDelSistema;
+  const limitador = dependencias.limitador ?? limitadorEnviosEnMemoria({ limites: dependencias.limites, reloj });
+  const repositorio = dependencias.repositorioOtp ?? repositorioOtpEnMemoria();
   return {
     solicitarCodigo: async (peticion) => {
       await limitador.registrar({ telefono: peticion.telefono, dispositivoId: peticion.dispositivoId });
+      const codigo = generarCodigoOtp(aleatorio);
+      const creadoEn = reloj.ahora();
+      await repositorio.guardar({
+        telefono: peticion.telefono,
+        dispositivoId: peticion.dispositivoId,
+        canal: peticion.canal,
+        huellaCodigo: huellaDeCodigo(codigo),
+        creadoEn,
+        expiraEn: new Date(creadoEn.getTime() + dependencias.limites.vigenciaCodigoMs),
+        intentos: 0,
+        consumidoEn: null,
+      });
       await dependencias.outbox.encolar<typeof TIPO_EVENTO_OTP_SOLICITADO, PayloadOtpSolicitado>({
         tipo: TIPO_EVENTO_OTP_SOLICITADO,
         payload: {
           telefono: peticion.telefono,
           canal: peticion.canal,
           dispositivoId: peticion.dispositivoId,
-          codigo: generarCodigoOtp(aleatorio),
+          codigo,
         },
       });
     },
+    verificarCodigo: async ({ telefono, dispositivoId, codigo }) =>
+      verificarCodigo({
+        repositorio,
+        clave: { telefono, dispositivoId },
+        codigo,
+        limites: dependencias.limites,
+        reloj,
+      }),
   };
 }
 
