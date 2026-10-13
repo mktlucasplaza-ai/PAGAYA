@@ -31,3 +31,19 @@ export async function consultarSalud(
 
 export { obtenerCarta } from "./carta.ts";
 export { formatoCLP, renderizarCarta } from "./pantallaCarta.ts";
+export {
+  carroVacio,
+  agregarItem,
+  quitarItem,
+  actualizarCantidad,
+  actualizarNotas,
+  type Carro,
+  type ItemCarro,
+} from "./carro.ts";
+export {
+  claveCarro,
+  persistirCarro,
+  leerCarro,
+  vaciarCarro,
+  type Almacen,
+} from "./carroAlmacenado.ts";

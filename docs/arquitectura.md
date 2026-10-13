@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida`, §15 el registro de auditoría y §45 leer la carta sin sesión: agregadas el 2026-10-10) |
+| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida`, §15 el registro de auditoría y §45 leer la carta sin sesión: agregadas el 2026-10-10; §47 el carro del cliente: agregada el 2026-10-12) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -1862,3 +1862,43 @@ orden sigue siendo el de `orden` (AT-18), igual que lo entrega F1-30a.
 | Ocultar los agotados | Es exactamente lo que AT-90 ya descartó para la API; repetirlo en la pantalla contradice RF-C-03. |
 | Solo tachar, sin aviso de texto | El tachado no es accesible para lectores de pantalla ni se distingue bien en gama baja con poco contraste; el texto "Agotado" no depende de verlo. |
 | Mover los agotados al final de su categoría | Reordenar por disponibilidad es una decisión de producto que ningún RF pide hoy; además divergiría del orden que ya fija AT-18. |
+
+## 47. El carro del cliente, persistido en el dispositivo (F1-31a)
+
+**F1-31a** del [backlog](backlog-fase-1.md) expone RF-C-04 ("armar pedido:
+cantidad, notas al ítem […] y opciones/variantes"). No agrega migraciones ni
+toca `@pagaya/api` ni `@pagaya/base-datos`: el carro no existe en el servidor
+todavía, F1-40 es quien lo envía.
+
+### AT-97 — El carro guarda ids de la carta, no una copia; persiste en `localStorage` namespaced por local
+
+**Qué lo exige.** La fila pide que "recargar la página con el carro armado lo
+encuentra intacto"; `localStorage` es el único almacenamiento del navegador
+que sobrevive a una recarga sin pedir permiso ni exigir cuenta (RF-C-04 no
+exige sesión para armar el pedido, igual que AT-90 para leer la carta). AT-95
+(§46) ya fijó que esta app no tiene marco de interfaz ni empaquetador, y que
+sus pruebas corren con `node --test`, sin `jsdom`: la persistencia tenía que
+quedar igual de proba sin navegador.
+
+**Decisión.** `carro.ts` define `Carro`/`ItemCarro` como funciones puras
+(`agregarItem`, `quitarItem`, `actualizarCantidad`, `actualizarNotas`) sobre un
+estado inmutable; un `ItemCarro` guarda `productoId` y `varianteIds` —los ids
+que ya sirve `RespuestaCarta` (F1-30a)— nunca el nombre ni el precio, para que
+un cambio de precio en la carta no deje un carro con un dato viejo. Cada
+llamada a `agregarItem` crea una línea nueva con su propio id (no fusiona
+cantidades de un mismo producto): dos líneas del mismo producto pueden llevar
+notas distintas, y fusionarlas obligaría a decidir con cuál se queda. La
+persistencia vive aparte, en `carroAlmacenado.ts`: `persistirCarro`/
+`leerCarro` reciben un `Almacen` (el subconjunto de `Storage` que usan) en vez
+de leer `localStorage` directo, bajo la clave `pagaya:carro:<local>` —
+namespaced por local porque RF-C-24 ya deja claro que un mismo dispositivo
+puede explorar más de un local sin cuenta—, y `leerCarro` nunca lanza: un dato
+ausente o corrupto vuelve como carro vacío, no como pantalla rota.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Guardar también nombre, precio y foto del producto en el ítem | Harían falta de nuevo para mostrar el carro, pero divergirían de la carta si el local cambia un precio mientras el cliente arma el pedido; F1-31b valida contra el catálogo antes de enviar, así que el carro no necesita su propia copia. |
+| Fusionar automáticamente dos líneas del mismo producto y las mismas variantes | Dos líneas idénticas en producto y variantes pueden llevar notas distintas ("sin cebolla" / "bien cocida"); fusionar obligaría a elegir una nota y perder la otra, algo que RF-C-04 no pide. |
+| `sessionStorage` en vez de `localStorage` | `sessionStorage` no sobrevive a cerrar la pestaña, y en el dispositivo de un cliente real (gama baja, PRD-001 §14) una pestaña en segundo plano puede morir y perder el carro; la fila pide explícitamente que sobreviva a la recarga. |
+| Leer `localStorage` directo en `carro.ts`, sin el tipo `Almacen` | Habría acoplado las funciones del carro al navegador, igual que AT-95 evitó acoplar `renderizarCarta` a `document`; la prueba de "recargar la página" no podría correr con `node --test`. |
+
