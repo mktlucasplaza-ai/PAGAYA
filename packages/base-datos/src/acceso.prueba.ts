@@ -70,6 +70,7 @@ describe("la capa de acceso", () => {
         "directorioMigraciones",
         "leerCarta",
         "listarMigraciones",
+        "mesasAsignadasAlMesero",
         "migrarAmbiente",
       ],
       "packages/base-datos/src/index.ts solo expone la capa de acceso y las migraciones",

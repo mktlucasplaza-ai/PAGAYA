@@ -5,7 +5,7 @@
 | **Alcance según** | PRD-001 a PRD-007 (RF vigentes, con sus modificaciones aplicadas) |
 | **Cubre** | Fases 1 a 3 de [PRD-001 §18](../prds/PRD-001-pagaya-mvp.md); la Fase 4 reusa lo mismo |
 | **Estado** | Propuesta vigente. Se edita cuando un PRD nuevo la contradiga |
-| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida`, §15 el registro de auditoría y §45 leer la carta sin sesión: agregadas el 2026-10-10; §47 el carro del cliente: agregada el 2026-10-12) |
+| **Fecha** | 2026-10-04 (§9 la identidad, §10 el aislamiento por local, §11 la carga del local piloto y §12 el catálogo, las mesas y el personal: agregadas el 2026-10-06; §14 el puerto de encolar antes de `evento_salida`, §15 el registro de auditoría y §45 leer la carta sin sesión: agregadas el 2026-10-10; §47 el carro del cliente: agregada el 2026-10-12; §17 las mesas del mesero en el turno vigente: agregada el 2026-10-15) |
 
 > Este documento **no define alcance**: traduce a decisiones técnicas lo que los
 > PRDs ya exigen. Si algo de aquí contradice un PRD, manda el PRD. Cada decisión
@@ -1763,6 +1763,65 @@ transacción que ya exige el índice único de AT-20.
 - F1-15 (cierre de la sesión con rotación de PIN) envuelve `cerrarMesa` y
   `cerrarSesion`; no repite la transición, solo le agrega los efectos que
   PRD-002 §3.4 pide al cerrar.
+
+## 17. Las mesas del mesero en el turno vigente (F1-60a)
+
+**F1-60a** del [backlog](backlog-fase-1.md) es la primera lectura de
+`pagaya.asignacion` (migración 0003, §12) desde que existe: RF-M-01 pide "ver
+solo las mesas asignadas a él en el turno, con estado de cada una". Las
+tablas, la clave `UNIQUE (local_id, turno_id, mesa_id)` y el índice
+`asignacion_por_mesero` ya están; lo único que faltaba decidir es qué turno es
+"el vigente" en el instante en que el mesero abre la pantalla.
+
+### 17.1 AT-38 — El turno vigente se calcula en PostgreSQL, con la hora del local
+
+**Qué lo exige.** PRD-001 §13: "zona horaria y turnos por local". La migración
+0003 ya dijo, en su propio comentario, que `turno.inicio`/`fin` son la hora del
+**local**, no un instante, y que un `fin < inicio` cruza medianoche —el caso
+normal de la cena—. AT-15 (§10.4) ya resolvió el mismo problema para el día: "la
+fecha del local la calcula la base, no el proceso", precisamente para que "el
+día" no dependa de la zona horaria del servidor ni de la del teléfono de quien
+mira. La misma razón vale, letra por letra, para la hora.
+
+**Decisión.** `mesasAsignadasAlMesero` (`@pagaya/base-datos/asignacion.ts`,
+reexportada por `@pagaya/mesa`) hace dos consultas en la misma transacción
+`conLocal`: primero `(ahora::timestamptz AT TIME ZONE zona_horaria)::time`
+contra `pagaya.local`, igual que `pagaya.fecha_local` pero a `time`; después
+compara esa hora contra `turno.inicio`/`fin` de cada asignación del mesero, con
+un `CASE` que invierte la comparación cuando el turno cruza medianoche. `ahora`
+lo entrega un `Reloj` inyectable (`@pagaya/nucleo`), como en `identidad` y
+`notificacion`, para que la prueba contra PostgreSQL real pueda fijar el
+instante sin esperar al reloj del sistema.
+
+Dos puntos menores que también son decisión, porque el esquema no los cierra
+por sí solo:
+
+- **El intervalo es `[inicio, fin)`**, cerrado al inicio y abierto al final:
+  si un turno termina exactamente cuando otro empieza, el instante de la
+  frontera cae en el que empieza, no en los dos. Sin esto, dos turnos
+  contiguos tendrían un segundo en el que ambos —o ninguno, según cómo se
+  escriba la comparación— se consideran vigentes.
+- **Si dos turnos del local se superponen, las mesas de los dos cuentan.**
+  Nada en la migración 0003 lo impide —no hay `EXCLUDE` ni `CHECK` entre
+  filas de `turno`— y ninguna tarea de Fase 1 lo valida en el archivo de
+  carga. Ante esa ambigüedad, mostrarle al mesero una mesa de más es
+  preferible a ocultarle una que sí le toca; `asignacion_una_mesa_un_mesero_por_turno`
+  sigue garantizando que, dentro de cada turno, una mesa tiene a lo más un
+  mesero.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Calcular la hora local en TypeScript (`Intl.DateTimeFormat` con `timeZone`) | Es exactamente lo que AT-15 descartó para la fecha: duplicar en dos lenguajes la tabla de desfases y de horario de verano es la forma más cara de que un día se calcule distinto en una prueba y en producción. `pagaya.local.zona_horaria` ya está validada contra lo que PostgreSQL reconoce (`pagaya.zona_horaria_valida`); preguntarle a la misma base es preguntarle una sola vez. |
+| Prohibir turnos superpuestos con una restricción nueva | Exigiría una migración, que esta tarea no agrega por alcance (de sobra, el administrador de turnos es RF-A-04, Fase 4); y es una regla de **producto** —¿puede un local tener dos turnos a la misma hora en zonas distintas del salón?— que ningún PRD responde todavía. Se deja como ambigüedad explícita, no como bug silencioso. |
+| Elegir un solo turno "vigente" cuando hay superposición (p. ej. el de creación más reciente) | Inventa una regla de desempate que ningún RF pide, para un caso que el esquema ya permite a propósito de no decidir. Devolver la unión es la opción que no esconde la ambigüedad. |
+
+**Consecuencias.**
+
+- `@pagaya/base-datos` no exporta ninguna función SQL nueva (`pagaya.hora_local`
+  o similar): la expresión `AT TIME ZONE` vive en la consulta, no en una
+  migración, porque F1-60a no agrega esquema.
+- Si algún día un local necesita que sus turnos no se superpongan, es una
+  migración con su propia AT, no una ampliación de ésta.
 
 ## 30. El límite de envíos de OTP, como puerto en memoria (F1-20c)
 

@@ -149,7 +149,7 @@ identidad, o concurrencia; Sonnet en todo lo demás.
 | ID | Tarea | RF / referencia | Depende de | Estimación | Paquetes | Terminada cuando | Modelo | Estado |
 |---|---|---|---|---|---|---|---|---|
 | **F1-60** | **Mesas asignadas del turno, con el estado de cada una** | RF-M-01 | F1-05, F1-10 | **4 d** | ver sub-tareas | todas sus sub-tareas terminadas | ver sub-tareas | Pendiente |
-| F1-60a | Consulta de mesas asignadas al mesero en el turno activo | RF-M-01 | F1-05, F1-10a | — | @pagaya/base-datos, @pagaya/mesa | Prueba de integración: devuelve solo las mesas de `asignacion` del mesero y turno vigentes | Sonnet | Pendiente |
+| F1-60a | Consulta de mesas asignadas al mesero en el turno activo | RF-M-01 | F1-05, F1-10a | — | @pagaya/base-datos, @pagaya/mesa | Prueba de integración: devuelve solo las mesas de `asignacion` del mesero y turno vigentes | Sonnet | Hecha |
 | F1-60b | Pantalla con el estado de cada mesa asignada | RF-M-01 | F1-60a | — | @pagaya/web | Prueba end-to-end: muestra el estado correcto de cada mesa asignada | Sonnet | Pendiente |
 | **F1-61** | **Ítems pendientes de entrega por mesa, ordenados por antigüedad** | RF-M-05 | F1-41 | **3 d** | ver sub-tareas | todas sus sub-tareas terminadas | ver sub-tareas | Pendiente |
 | F1-61a | Consulta de ítems pendientes por mesa, ordenados por antigüedad | RF-M-05 | F1-41a | — | @pagaya/comanda | Prueba unitaria: ordena ítems de antigüedades distintas correctamente | Sonnet | Pendiente |
