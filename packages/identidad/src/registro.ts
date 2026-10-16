@@ -1,10 +1,13 @@
 /**
  * La frontera que F1-20 (OTP) y F1-21 (registro) van a implementar.
  *
- * **F1-21 (confirmar) no tiene implementación acá, y es a propósito.** Tiene
- * sus propios requisitos —menos de 40 s de punta a punta en gama baja
- * (RF-C-25), consentimiento con versión (RF-C-26)— y es otra tarea del
- * backlog.
+ * **`confirmar` no tiene implementación acá, y es a propósito.** Tiene sus
+ * propios requisitos —menos de 40 s de punta a punta en gama baja (RF-C-25),
+ * consentimiento con versión (RF-C-26)— y es otra tarea del backlog: F1-21b,
+ * la que hila el OTP ya verificado con el alta de la cuenta y la sesión.
+ *
+ * **F1-21a ya entregó el alta** (`cuenta.ts`, arquitectura.md §32): una cuenta
+ * por teléfono, en una sola operación atómica, sin abrir sesión.
  *
  * **F1-20a sí implementa `solicitarCodigo`**, y lo hace sobre el outbox de
  * `@pagaya/notificacion` (arquitectura.md §14, AT-25), no llamando a un
