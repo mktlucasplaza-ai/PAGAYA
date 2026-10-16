@@ -18,8 +18,11 @@
  * dispositivo (`LimitadorEnvios`, `limite-envios.ts`), delante del outbox.
  * **Lo que hay desde F1-20b:** la expiración y el límite de intentos de
  * verificación (`verificacion-otp.ts`), sobre el puerto `RepositorioOtp`.
- * **Lo que no hay:** confirmar el código, crear la cuenta y abrir la sesión
- * (F1-21). De eso queda declarada la frontera en `registro.ts`, sin
+ * **Lo que hay desde F1-21a:** el alta de la cuenta del cliente, con una cuenta
+ * por teléfono (`cuenta.ts`) y su adaptador de PostgreSQL
+ * (`cuenta-postgres.ts`, el primero de este módulo).
+ * **Lo que no hay:** `confirmar`, que hila el OTP verificado con el alta y la
+ * sesión (F1-21b). De eso queda declarada la frontera en `registro.ts`, sin
  * implementación.
  *
  * **Lo que no puede haber:** una importación de `mesa` o de `comanda`
@@ -88,6 +91,19 @@ export {
 export { limitadorEnviosEnMemoria, type LimitadorEnvios } from "./limite-envios.ts";
 
 export {
+  altaDeCuenta,
+  repositorioCuentasEnMemoria,
+  type AltaDeCuenta,
+  type AltaPersistida,
+  type CuentaCliente,
+  type DatosDeAlta,
+  type MotivoRechazoAlta,
+  type RepositorioCuentas,
+} from "./cuenta.ts";
+
+export { repositorioCuentasEnPostgres } from "./cuenta-postgres.ts";
+
+export {
   estadoDeOtp,
   huellaDeCodigo,
   repositorioOtpEnMemoria,
@@ -105,5 +121,5 @@ export const modulo: DescriptorModulo = {
   nombre: "identidad",
   capa: "dominio",
   responsabilidad:
-    "Roles, sesiones y acceso a la comanda (F1-03; PRD-001 §4, §12 y §14; PRD-004 §3). Solicitar OTP desde F1-20a (RF-C-02, PRD-004 §3), con el límite de envíos de F1-20c y la expiración y el límite de intentos de F1-20b (PRD-004 §8, PRD-001 §14); crear la cuenta, el consentimiento y el PAGAYA ID llegan con F1-21 y F1-22 (RF-C-25, RF-C-26; PRD-003 §3).",
+    "Roles, sesiones y acceso a la comanda (F1-03; PRD-001 §4, §12 y §14; PRD-004 §3). Solicitar OTP desde F1-20a (RF-C-02, PRD-004 §3), con el límite de envíos de F1-20c y la expiración y el límite de intentos de F1-20b (PRD-004 §8, PRD-001 §14); el alta de cuenta con una cuenta por teléfono desde F1-21a (RF-C-02 mod., PRD-004 §3). La sesión tras el OTP, el consentimiento y el PAGAYA ID llegan con F1-21b, F1-22 y la Fase 3 (RF-C-25, RF-C-26; PRD-003 §3).",
 };

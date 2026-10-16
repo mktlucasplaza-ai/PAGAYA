@@ -1920,6 +1920,56 @@ contador y el tope se salta pidiendo en paralelo.
   verdad protege son la vigencia y el tope. Si PRD-001 §14 exige además cifrado
   en reposo para esa columna, lo decide el carril 1 con la tabla.
 
+## 32. El alta de cuenta: una cuenta por teléfono (F1-21a)
+
+### Qué lo exige
+
+**RF-C-02 (mod. por PRD-004 §3)** pide "una cuenta por número de teléfono" y
+**PRD-004 §9, criterio 5** que un segundo registro con el mismo número "entre a
+la cuenta existente en lugar de crear otra": es una sola operación, no dos
+caminos. **No agrega migraciones:** `usuario_telefono_unico` existe desde la
+0003 y el cliente es un usuario sin `local_id` (§9.3).
+
+### Decisión (AT-65)
+
+`@pagaya/identidad` define el puerto `RepositorioCuentas` (`cuenta.ts`) con
+**una** operación, `altaDeCliente`: "crea la cuenta, o entra a la existente".
+**No existe un `porTelefono` seguido de un `crear`, y eso es el contrato, no
+una comodidad del adaptador:** en esa ventana dos registros simultáneos leen
+"no existe", los dos insertan y uno se cae contra la restricción —el cliente ve
+un error habiendo hecho todo bien—. En PostgreSQL es **una sentencia**
+(`cuenta-postgres.ts`, el primer adaptador de este módulo): `INSERT … ON
+CONFLICT (telefono) DO UPDATE SET actualizado_en = now() WHERE usuario.rol =
+'cliente' RETURNING …, (xmax = 0) AS insertada`, por `sinLocal` (§9.3: la
+cuenta del cliente no tiene local y la unicidad del teléfono es global). De ahí
+tres hechos, los tres probados contra PostgreSQL:
+
+1. **`DO UPDATE` y no `DO NOTHING`**, que no devuelve la fila en conflicto:
+   buscarla con un `SELECT` detrás reabre la ventana (`READ COMMITTED`).
+2. **El `nombre_pila` existente no se pisa.** "Entra a la cuenta" no es "edita
+   la cuenta": un tipeo cambiaría con qué nombre lo saluda el mesero (PRD-003 §3.4).
+3. **El conflicto contra un teléfono del personal es cero filas** —lo deja
+   fuera el `WHERE`— y se traduce al motivo `telefono_de_personal`: devolver la
+   cuenta del mesero sería darle una sesión de personal a quien pasó un OTP
+   de cliente (§9.2, S-9), y convertirla la prohíbe la 0003 (§9.4).
+
+### Alternativas descartadas
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| `SELECT` por teléfono y después `INSERT` | Medido antes de cambiarlo: `Promise.all` de dos registros con el mismo número rompe la segunda transacción contra `usuario_telefono_unico`. Hay una prueba que lo fija. |
+| `INSERT` y capturar el error de clave duplicada | Deja el camino feliz y el real distintos, con un código de error de PostgreSQL decidiendo una regla de producto; y sigue necesitando el `SELECT` después, con su ventana. |
+| Comparar `creado_en` con la hora que pasa el llamador, en vez de `xmax` | Dos registros paralelos con el mismo reloj —el de las pruebas lo es— darían los dos "insertada". `xmax` es cero solo en la fila que esta transacción insertó. |
+
+### Consecuencias
+
+- **El alta termina en una cuenta.** Abrir la sesión es F1-21b (AT-10: toda
+  sesión nace en `abrirSesion` o `promoverACuenta`), el OTP llega verificado de
+  F1-20b (§31), "registro completado" es F1-80a y el consentimiento, F1-22.
+- `altaDeCuenta` repite los límites del `CHECK` de la 0003 (E.164, nombre de 1
+  a 60) para que un dato mal tipeado sea un motivo contable y no una excepción
+  de PostgreSQL (PRD-003 §5); el dueño de la regla sigue siendo el esquema.
+
 ## 45. Leer la carta sin sesión (F1-30a)
 
 **F1-30a** del [backlog](backlog-fase-1.md) expone RF-C-03 (mod. PRD-004 §2.2:
@@ -2054,3 +2104,35 @@ ausente o corrupto vuelve como carro vacío, no como pantalla rota.
 | `sessionStorage` en vez de `localStorage` | `sessionStorage` no sobrevive a cerrar la pestaña, y en el dispositivo de un cliente real (gama baja, PRD-001 §14) una pestaña en segundo plano puede morir y perder el carro; la fila pide explícitamente que sobreviva a la recarga. |
 | Leer `localStorage` directo en `carro.ts`, sin el tipo `Almacen` | Habría acoplado las funciones del carro al navegador, igual que AT-95 evitó acoplar `renderizarCarta` a `document`; la prueba de "recargar la página" no podría correr con `node --test`. |
 
+## 48. El estado de la mesa, expuesto sin recalcularlo (F1-10c)
+
+**F1-10c** del [backlog](backlog-fase-1.md) expone PRD-001 §15: el estado de
+`pagaya.mesa` y la última `sesion_mesa` (migración 0004, §13), que F1-10b
+(§16) ya tipó como `EstadoMesa`/`EstadoSesionMesa`. No agrega migraciones ni
+transiciones: solo lee lo que F1-10a escribió y F1-10b tipó.
+
+### AT-102 — La lectura vive en `@pagaya/mesa`, no en `@pagaya/base-datos` ni en `@pagaya/api`
+
+**Qué lo exige.** `fronteras.json` no deja que `@pagaya/base-datos` (capa
+`infraestructura`) importe `@pagaya/mesa` (capa `dominio`): si la lectura
+viviera en `base-datos`, como `leerCarta`, tendría que redeclarar
+`EstadoMesa`/`EstadoSesionMesa` a mano, exactamente el "recálculo" que esta
+tarea tiene prohibido. `@pagaya/mesa` sí puede importar `@pagaya/base-datos`
+(ya lo hace, `fronteras.json`), así que la lectura entra por ahí.
+
+**Decisión.** `leerEstadoMesa(acceso, local, mesaId)` en
+`packages/mesa/src/lectura.ts` usa `Acceso.conLocal` para leer `mesa.estado` y
+la `sesion_mesa` más reciente de esa mesa (por `abierta_en`), y devuelve
+`EstadoMesa`/`EstadoSesionMesa` de `estados.ts` sin tocarlos. `GET
+/locales/<local>/mesas/<mesa>/estado` en `apps/api` llama a esa función y
+tipa su respuesta como `RespuestaEstadoMesa` (`@pagaya/contrato`, junto a
+`rutaEstadoMesa`) — el mismo patrón de `rutaCarta`/`RespuestaCarta` (§45):
+el servidor no puede devolver un campo que el contrato no declaró, porque
+`tsc` lo rechaza. Una mesa sin fila responde 404; una sesión inexistente
+(mesa que nunca abrió) es `sesion: null`, no un error.
+
+| Alternativa | Motivo del descarte |
+|---|---|
+| Repetir `leerCarta` y poner la lectura en `@pagaya/base-datos` | Obligaría a `base-datos` a redeclarar los estados de mesa a mano o a `@pagaya/api` a mapearlos después de leer texto plano — las dos formas del "recalcular" que esta tarea evita. |
+| Resolver la sesión activa por `comanda.estado = 'abierta'` en vez de la más reciente de `sesion_mesa` | Una comanda `pagada` o `anulada` deja la mesa sin sesión "abierta" aunque su historia reciente importe para el panel del mesero; ordenar por `abierta_en` sirve a los dos casos de la fila ("mesa abierta y cerrada") sin un `JOIN` contra `comanda`. |
+| Llamar a `ocuparMesa`/`abrirSesion` para "confirmar" el estado leído | Esas funciones son para decidir una transición nueva (F1-14a), no para validar una ya escrita; pasarles el estado leído y descartar su resultado sería ejercitar código de escritura en una ruta de solo lectura. |

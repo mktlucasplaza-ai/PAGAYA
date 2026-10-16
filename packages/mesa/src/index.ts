@@ -35,3 +35,9 @@ export {
 // acceso. La consulta y la decisión de qué es "el turno vigente" están en
 // docs/arquitectura.md §17 (AT-38): acá no se repiten ni se envuelven.
 export { mesasAsignadasAlMesero, type MesaAsignadaAlMesero } from "@pagaya/base-datos";
+
+export {
+  leerEstadoMesa,
+  type EstadoMesaLeido,
+  type SesionMesaLeida,
+} from "./lectura.ts";
