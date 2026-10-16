@@ -22,6 +22,9 @@ export type { OpcionesAmbiente } from "./ambiente.ts";
 export { leerCarta } from "./catalogo.ts";
 export type { CategoriaCarta, ProductoCarta, VarianteCarta } from "./catalogo.ts";
 
+export { mesasAsignadasAlMesero } from "./asignacion.ts";
+export type { MesaAsignadaAlMesero } from "./asignacion.ts";
+
 export {
   aplicarMigraciones,
   directorioMigraciones,

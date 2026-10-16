@@ -30,6 +30,12 @@ export {
   type ResultadoSesion,
 } from "./estados.ts";
 
+// Re-exportada de @pagaya/base-datos (F1-60a, RF-M-01): quien pida "las mesas
+// de este mesero" lo pide a `mesa`, el dueño del dominio, no a la capa de
+// acceso. La consulta y la decisión de qué es "el turno vigente" están en
+// docs/arquitectura.md §17 (AT-38): acá no se repiten ni se envuelven.
+export { mesasAsignadasAlMesero, type MesaAsignadaAlMesero } from "@pagaya/base-datos";
+
 export {
   leerEstadoMesa,
   type EstadoMesaLeido,
