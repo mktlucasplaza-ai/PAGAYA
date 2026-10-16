@@ -68,3 +68,24 @@ export type CategoriaCarta = {
 export type RespuestaCarta = {
   readonly categorias: readonly CategoriaCarta[];
 };
+
+/**
+ * `GET /locales/<local>/mesas/<mesa>/estado` (F1-10c, arquitectura.md §48).
+ * El estado sale de las funciones de `@pagaya/mesa` (F1-10b, §16); este
+ * contrato solo nombra la forma de la respuesta, igual que `RespuestaCarta`
+ * con `leerCarta`.
+ */
+export function rutaEstadoMesa(local: string, mesa: string): string {
+  return `/locales/${local}/mesas/${mesa}/estado`;
+}
+
+export type SesionMesaRespuesta = {
+  readonly estado: "abierta" | "cerrada";
+  readonly abiertaEn: string;
+  readonly cerradaEn: string | null;
+};
+
+export type RespuestaEstadoMesa = {
+  readonly estado: "libre" | "ocupada" | "pago_pendiente" | "pagada" | "bloqueada";
+  readonly sesion: SesionMesaRespuesta | null;
+};

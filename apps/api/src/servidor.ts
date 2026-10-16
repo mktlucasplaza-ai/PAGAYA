@@ -20,8 +20,10 @@ import {
   RUTA_SALUD,
   VERSION_CONTRATO,
   type RespuestaCarta,
+  type RespuestaEstadoMesa,
   type RespuestaSalud,
 } from "@pagaya/contrato";
+import { leerEstadoMesa } from "@pagaya/mesa";
 import { ErrorPagaya, relojDelSistema, type Reloj } from "@pagaya/nucleo";
 
 import { MODULOS } from "./modulos.ts";
@@ -33,6 +35,9 @@ export type DependenciasApi = {
 
 /** `/locales/<uuid>/carta`. RF-C-03 y RF-C-24: la carta se ve sin sesión. */
 const RUTA_CARTA = /^\/locales\/([^/]+)\/carta$/;
+
+/** `/locales/<uuid>/mesas/<uuid>/estado` (F1-10c, arquitectura.md §48). */
+const RUTA_ESTADO_MESA = /^\/locales\/([^/]+)\/mesas\/([^/]+)\/estado$/;
 
 export function crearServidor(config: Configuracion, dependencias: DependenciasApi = {}): Server {
   const reloj = dependencias.reloj ?? relojDelSistema;
@@ -69,6 +74,49 @@ export function crearServidor(config: Configuracion, dependencias: DependenciasA
       leerCarta(acceso, local)
         .then((categorias) => {
           const cuerpo: RespuestaCarta = { categorias };
+          respuesta.writeHead(200, { "content-type": "application/json; charset=utf-8" });
+          respuesta.end(JSON.stringify(cuerpo));
+        })
+        .catch((error: unknown) => {
+          if (error instanceof ErrorPagaya && error.codigo === "acceso_invalido") {
+            respuesta.writeHead(400, { "content-type": "application/json; charset=utf-8" });
+            respuesta.end(JSON.stringify({ error: error.codigo, detalle: error.message }));
+            return;
+          }
+          respuesta.writeHead(500, { "content-type": "application/json; charset=utf-8" });
+          respuesta.end(JSON.stringify({ error: "error_interno" }));
+        });
+      return;
+    }
+
+    const estadoMesa = RUTA_ESTADO_MESA.exec(ruta);
+    if (estadoMesa !== null && peticion.method === "GET") {
+      if (acceso === undefined) {
+        respuesta.writeHead(503, { "content-type": "application/json; charset=utf-8" });
+        respuesta.end(JSON.stringify({ error: "sin_acceso_a_base_de_datos" }));
+        return;
+      }
+
+      const local = estadoMesa[1] as string;
+      const mesaId = estadoMesa[2] as string;
+      leerEstadoMesa(acceso, local, mesaId)
+        .then((leido) => {
+          if (leido === null) {
+            respuesta.writeHead(404, { "content-type": "application/json; charset=utf-8" });
+            respuesta.end(JSON.stringify({ error: "mesa_no_encontrada" }));
+            return;
+          }
+          const cuerpo: RespuestaEstadoMesa = {
+            estado: leido.estado,
+            sesion:
+              leido.sesion === null
+                ? null
+                : {
+                    estado: leido.sesion.estado,
+                    abiertaEn: leido.sesion.abiertaEn.toISOString(),
+                    cerradaEn: leido.sesion.cerradaEn?.toISOString() ?? null,
+                  },
+          };
           respuesta.writeHead(200, { "content-type": "application/json; charset=utf-8" });
           respuesta.end(JSON.stringify(cuerpo));
         })
